@@ -1,6 +1,7 @@
 """Tool: Recover software architecture from dependency graph."""
 
 from arcade_agent.algorithms.acdc import acdc
+from arcade_agent.algorithms.arc import arc
 from arcade_agent.algorithms.clustering import wca
 from arcade_agent.models.architecture import Architecture, Component
 from arcade_agent.models.graph import DependencyGraph
@@ -115,7 +116,8 @@ def _common_prefix_segments(packages: list[str]) -> list[str]:
 @tool(
     name="recover",
     description="Recover software architecture from a dependency graph. "
-    "Supports multiple algorithms: pkg (package-based), wca (weighted clustering), acdc (pattern-based).",
+    "Supports multiple algorithms: pkg (package-based), wca (weighted clustering), "
+    "acdc (pattern-based), arc (concern-based via LLM).",
 )
 def recover(
     dep_graph: DependencyGraph,
@@ -123,6 +125,7 @@ def recover(
     num_clusters: int | None = None,
     similarity_measure: str = "uem",
     pkg_depth: int | None = None,
+    hybrid_weight: float = 0.5,
 ) -> Architecture:
     """Recover software architecture using the specified algorithm.
 
@@ -132,9 +135,12 @@ def recover(
             - 'pkg': Package-based grouping (fast, deterministic)
             - 'wca': Weighted Clustering Algorithm (agglomerative)
             - 'acdc': ACDC pattern-based clustering
-        num_clusters: Target number of clusters (for WCA). Auto if None.
+            - 'arc': Architecture Recovery using Concerns (LLM-powered)
+        num_clusters: Target number of clusters (for WCA/ARC). Auto if None.
         similarity_measure: Similarity measure for WCA ('js', 'uem', 'scm').
         pkg_depth: Package depth for 'pkg' algorithm. Auto if None.
+        hybrid_weight: ARC semantic/structural blend (0-1). 1.0 = pure semantic,
+            0.0 = pure structural, 0.5 = equal blend (default).
 
     Returns:
         Architecture with recovered components.
@@ -149,5 +155,11 @@ def recover(
         )
     elif algorithm == "acdc":
         return acdc(dep_graph)
+    elif algorithm == "arc":
+        return arc(
+            dep_graph,
+            num_clusters=num_clusters,
+            hybrid_weight=hybrid_weight,
+        )
     else:
-        raise ValueError(f"Unknown algorithm: {algorithm}. Use: pkg, wca, acdc")
+        raise ValueError(f"Unknown algorithm: {algorithm}. Use: pkg, wca, acdc, arc")

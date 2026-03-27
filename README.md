@@ -45,8 +45,8 @@ visualize(repo.name, repo.version, graph, arch, smells, output="report.html")
 |------|-------------|
 | `ingest` | Clone/load source code, detect versions, discover files |
 | `parse` | Parse source → DependencyGraph via tree-sitter |
-| `recover` | Recover architecture (package-based, WCA, ACDC) |
-| `detect_smells` | Find dependency cycles, concern overload, scattered functionality, link overload |
+| `recover` | Recover architecture (package-based, WCA, ACDC, ARC) |
+| `detect_smells` | Find dependency cycles, concern overload, scattered functionality, link overload (heuristic or LLM-powered) |
 | `compute_metrics` | Calculate RCI, TurboMQ, connectivity metrics |
 | `compare` | A2A architecture comparison across versions |
 | `visualize` | Generate HTML reports, DOT, Mermaid, JSON, RSF |
@@ -71,3 +71,81 @@ python examples/basic_analysis.py arcade_core --language java
 Results (v1.2.0): 170 entities, 470 edges, 13 components recovered, 7 architectural smells detected (including a 7-component dependency cycle and concern overload in the Clustering module).
 
 See [`examples/arcade_core_report.html`](https://lemduc.github.io/arcade-agent/examples/arcade_core_report.html) for the full interactive report.
+
+### Algorithm Comparison
+
+Compare PKG, ACDC, and ARC recovery algorithms side-by-side on the same project:
+
+```bash
+python examples/compare_algorithms.py arcade_core --language java --use-llm
+```
+
+See [`examples/comparison_report.html`](https://lemduc.github.io/arcade-agent/examples/comparison_report.html) for the full comparison report.
+
+## LLM-Powered Analysis
+
+Pass `--use-llm` to enable Claude-powered concern detection. Requires the `claude` CLI installed and authenticated.
+
+```bash
+python examples/basic_analysis.py arcade_core --language java --use-llm
+```
+
+This replaces heuristic smell detection (entity count thresholds, suffix matching) with semantic analysis that identifies *what* concerns each component handles and *why* they are problematic. Set `ARCADE_MOCK=1` to skip LLM calls, or `ARCADE_MODEL=haiku` to use a faster model.
+
+## Roadmap
+
+arcade-agent ports and extends the capabilities of the original [ARCADE](https://github.com/usc-softarch/arcade_core) Java workbench. Below is what has been implemented and what remains.
+
+| Feature | Status | Details |
+|---------|--------|---------|
+| 4 recovery algorithms (PKG, WCA, ACDC, ARC) | Done | Package-based, weighted clustering, pattern-based, LLM concern-based |
+| 4 smell types (BDC, BCO, SPF, BUO) | Done | Heuristic + LLM-powered detection |
+| 6 quality metrics | Done | RCI, TurboMQ, BasicMQ, IntraConnectivity, InterConnectivity, TwoWayPairRatio |
+| A2A architecture comparison | Done | Hungarian algorithm on Jaccard similarity |
+| Multi-language parsing | Done | Java, Python, C/C++ (full), TypeScript (stub) |
+| 5 export formats | Done | HTML, DOT, JSON, RSF, Mermaid |
+| LLM concern extraction | Done | Claude CLI for semantic BCO/SPF detection |
+| Multi-version evolution pipeline | Planned | Batch version history analysis, A2A cost trends, CVG over time |
+| Flexible stopping criteria | Planned | `no_orphans`, `size_fraction` strategies for WCA/ARC |
+| ARC algorithm | Done | Concern-based clustering using LLM semantic vectors + JS divergence |
+| LIMBO algorithm | Planned | Information-theoretic clustering |
+| Additional similarity measures | Planned | UEMNM (normalized UEM) and InfoLoss |
+| Architectural Stability metric | Planned | Fan-in/fan-out ratio |
+| MCFP-based comparison | Planned | Minimum Cost Flow for accurate entity movement cost |
+| Design decision recovery (RecovAr) | Planned | Link issue trackers to architectural changes |
+
+## Comparison with ARCADE Core
+
+arcade-agent is a Python successor to the original [ARCADE Core](https://github.com/usc-softarch/arcade_core) Java workbench. The table below compares capabilities across both projects.
+
+### High Value
+
+| Feature | ARCADE Core (Java) | arcade-agent (Python) | Notes |
+|---------|--------------------|-----------------------|-------|
+| LIMBO algorithm | Full | Missing | Information-theoretic clustering |
+| ARC algorithm | Full (concern-based) | Done (LLM-powered) | Uses Claude CLI concern vectors + JS divergence instead of MALLET topics |
+| Topic modeling (MALLET) | Full (50 topics, 250 iterations) | LLM-based | arcade-agent uses Claude CLI instead of MALLET for semantic concern analysis |
+| Evolution metrics (A2A cost, CVG) | MCFP-based movement cost, coverage | Basic Jaccard comparison | Core computes actual entity movement costs and bidirectional coverage |
+| Multi-version batch analysis | VersionMap, VersionTree, batch processing | Single-pair compare | Core can process entire version histories and track trends |
+| Stopping/serialization criteria | 3 stopping + 4 serialization strategies | Hardcoded target cluster count | Flexible termination (no-orphans, size-fraction) would improve clustering |
+| Similarity measures | 11 (UEMNM, InfoLoss, WeightedJS, ARC variants) | 3 (JS, UEM, SCM) | More measures = better tuning per project type |
+
+### Medium Value
+
+| Feature | ARCADE Core (Java) | arcade-agent (Python) | Notes |
+|---------|--------------------|-----------------------|-------|
+| Architectural Stability metric | Fan-in/fan-out ratio | Missing | Simple addition to existing 6 metrics |
+| Concern-based smell detection | Topic distributions for BCO and SPF | LLM-powered (Claude CLI) | Heuristic fallback also available |
+| Cluster matching (MCFP) | Minimum Cost Flow for movement cost | Hungarian algorithm on Jaccard | MCFP gives more accurate evolution cost |
+| ODEM input format | XML-based dependency parsing | Missing | Academic interchange format, limited real-world use |
+| SmellToIssuesCorrelation | Correlates smells with issue tracker data | Missing | Requires issue tracker integration |
+
+### Lower Priority
+
+| Feature | ARCADE Core (Java) | arcade-agent (Python) | Notes |
+|---------|--------------------|-----------------------|-------|
+| RecovAr (Design Decision Recovery) | Full engine (GitLab issues/commits) | Missing | Large scope research feature |
+| Issue tracker integration | JIRA + GitLab REST clients | Missing | Needed for RecovAr or SmellToIssues |
+| Swing GUI | Full desktop visualization | HTML reports + CLI | HTML/Mermaid is more modern |
+| Classycle bytecode analysis | Java bytecode dependency extraction | tree-sitter source parsing | tree-sitter is arguably better (no compilation needed) |
+| Make dependency / Understand CSV | C-specific input formats | Missing | Niche; tree-sitter C parser covers the core need |
