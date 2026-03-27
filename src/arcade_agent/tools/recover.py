@@ -3,6 +3,7 @@
 from arcade_agent.algorithms.acdc import acdc
 from arcade_agent.algorithms.arc import arc
 from arcade_agent.algorithms.clustering import wca
+from arcade_agent.algorithms.limbo import limbo
 from arcade_agent.models.architecture import Architecture, Component
 from arcade_agent.models.graph import DependencyGraph
 from arcade_agent.registry import tool
@@ -120,7 +121,7 @@ def _common_prefix_segments(packages: list[str]) -> list[str]:
     name="recover",
     description="Recover software architecture from a dependency graph. "
     "Supports multiple algorithms: pkg (package-based), wca (weighted clustering), "
-    "acdc (pattern-based), arc (concern-based via LLM).",
+    "acdc (pattern-based), arc (concern-based via LLM), limbo (information-theoretic).",
 )
 def recover(
     dep_graph: DependencyGraph,
@@ -139,7 +140,8 @@ def recover(
             - 'wca': Weighted Clustering Algorithm (agglomerative)
             - 'acdc': ACDC pattern-based clustering
             - 'arc': Architecture Recovery using Concerns (LLM-powered)
-        num_clusters: Target number of clusters (for WCA/ARC). Auto if None.
+            - 'limbo': Information-theoretic clustering (LLM-powered)
+        num_clusters: Target number of clusters (for WCA/ARC/LIMBO). Auto if None.
         similarity_measure: Similarity measure for WCA ('js', 'uem', 'scm').
         pkg_depth: Package depth for 'pkg' algorithm. Auto if None.
         hybrid_weight: ARC semantic/structural blend (0-1). 1.0 = pure semantic,
@@ -164,5 +166,11 @@ def recover(
             num_clusters=num_clusters,
             hybrid_weight=hybrid_weight,
         )
+    elif algorithm == "limbo":
+        return limbo(
+            dep_graph,
+            num_clusters=num_clusters,
+            hybrid_weight=hybrid_weight,
+        )
     else:
-        raise ValueError(f"Unknown algorithm: {algorithm}. Use: pkg, wca, acdc, arc")
+        raise ValueError(f"Unknown algorithm: {algorithm}. Use: pkg, wca, acdc, arc, limbo")

@@ -47,7 +47,7 @@ visualize(repo.name, repo.version, graph, arch, smells, output="report.html")
 |------|-------------|
 | `ingest` | Clone/load source code, detect versions, discover files |
 | `parse` | Parse source → DependencyGraph via tree-sitter |
-| `recover` | Recover architecture (package-based, WCA, ACDC, ARC) |
+| `recover` | Recover architecture (PKG, WCA, ACDC, ARC, LIMBO) |
 | `detect_smells` | Find dependency cycles, concern overload, scattered functionality, link overload (heuristic or LLM-powered) |
 | `compute_metrics` | Calculate RCI, TurboMQ, connectivity metrics |
 | `compare` | A2A architecture comparison across versions |
@@ -76,7 +76,7 @@ See [`examples/arcade_core_report.html`](https://lemduc.github.io/arcade-agent/e
 
 ### Algorithm Comparison
 
-Compare PKG, ACDC, and ARC recovery algorithms side-by-side on the same project:
+Compare PKG, ACDC, ARC, and LIMBO recovery algorithms side-by-side on the same project:
 
 ```bash
 python examples/compare_algorithms.py arcade_core --language java --use-llm
@@ -100,7 +100,7 @@ arcade-agent ports and extends the capabilities of the original [ARCADE](https:/
 
 | Feature | Status | Details |
 |---------|--------|---------|
-| 4 recovery algorithms (PKG, WCA, ACDC, ARC) | Done | Package-based, weighted clustering, pattern-based, LLM concern-based |
+| 5 recovery algorithms (PKG, WCA, ACDC, ARC, LIMBO) | Done | Package-based, weighted clustering, pattern-based, LLM concern-based, information-theoretic |
 | 4 smell types (BDC, BCO, SPF, BUO) | Done | Heuristic + LLM-powered detection |
 | 6 quality metrics | Done | RCI, TurboMQ, BasicMQ, IntraConnectivity, InterConnectivity, TwoWayPairRatio |
 | A2A architecture comparison | Done | Hungarian algorithm on Jaccard similarity |
@@ -108,9 +108,7 @@ arcade-agent ports and extends the capabilities of the original [ARCADE](https:/
 | 5 export formats | Done | HTML, DOT, JSON, RSF, Mermaid |
 | LLM concern extraction | Done | Claude CLI for semantic BCO/SPF detection |
 | Multi-version evolution pipeline | Planned | Batch version history analysis, A2A cost trends, CVG over time |
-| Flexible stopping criteria | Planned | `no_orphans`, `size_fraction` strategies for WCA/ARC |
-| ARC algorithm | Done | Concern-based clustering using LLM semantic vectors + JS divergence |
-| LIMBO algorithm | Planned | Information-theoretic clustering |
+| Flexible stopping criteria | Planned | `no_orphans`, `size_fraction` strategies for WCA/ARC/LIMBO |
 | Additional similarity measures | Planned | UEMNM (normalized UEM) and InfoLoss |
 | Architectural Stability metric | Planned | Fan-in/fan-out ratio |
 | MCFP-based comparison | Planned | Minimum Cost Flow for accurate entity movement cost |
@@ -124,7 +122,7 @@ arcade-agent is a Python successor to the original [ARCADE Core](https://github.
 
 | Feature | ARCADE Core (Java) | arcade-agent (Python) | Notes |
 |---------|--------------------|-----------------------|-------|
-| LIMBO algorithm | Full | Missing | Information-theoretic clustering |
+| LIMBO algorithm | Full | Done (LLM-powered) | Uses Claude CLI concern vectors + size-weighted JS divergence |
 | ARC algorithm | Full (concern-based) | Done (LLM-powered) | Uses Claude CLI concern vectors + JS divergence instead of MALLET topics |
 | Topic modeling (MALLET) | Full (50 topics, 250 iterations) | LLM-based | arcade-agent uses Claude CLI instead of MALLET for semantic concern analysis |
 | Evolution metrics (A2A cost, CVG) | MCFP-based movement cost, coverage | Basic Jaccard comparison | Core computes actual entity movement costs and bidirectional coverage |

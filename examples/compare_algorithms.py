@@ -47,6 +47,7 @@ def main():
         ("pkg", {}),
         ("acdc", {}),
         ("arc", {"hybrid_weight": 0.5}),
+        ("limbo", {"hybrid_weight": 1.0}),
     ]
 
     results = []
