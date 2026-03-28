@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Compare current analysis results against a baseline and output Markdown.
 
+Uses arcade-agent's compare tool (A2A analysis with Hungarian algorithm) for
+proper architecture-to-architecture comparison when entity data is available.
+
 Usage:
     python scripts/compare_baseline.py current.json baseline.json [--output comment.md]
 
@@ -12,25 +15,31 @@ import json
 import sys
 from pathlib import Path
 
+# Ensure arcade_agent is importable from src/
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
+from arcade_agent.models.architecture import Architecture, Component
+from arcade_agent.tools.compare import compare
+
 
 def _delta(new: float, old: float) -> str:
     diff = new - old
     if abs(diff) < 0.0001:
-        return "→ (no change)"
-    arrow = "↑" if diff > 0 else "↓"
+        return "\u2192 (no change)"
+    arrow = "\u2191" if diff > 0 else "\u2193"
     return f"{arrow} ({diff:+.4f})"
 
 
 def _severity_icon(severity: str) -> str:
-    return {"high": "🔴", "medium": "🟡", "low": "🟢"}.get(severity.lower(), "⚪")
+    return {"high": "\U0001f534", "medium": "\U0001f7e1", "low": "\U0001f7e2"}.get(severity.lower(), "\u26aa")
 
 
 def _rci_icon(rci: float) -> str:
     if rci >= 0.8:
-        return "🟢"
+        return "\U0001f7e2"
     if rci >= 0.6:
-        return "🟡"
-    return "🔴"
+        return "\U0001f7e1"
+    return "\U0001f534"
 
 
 def _quality_label(rci: float) -> str:
@@ -39,6 +48,31 @@ def _quality_label(rci: float) -> str:
     if rci >= 0.6:
         return "Fair"
     return "Poor"
+
+
+def _reconstruct_architecture(data: dict) -> Architecture | None:
+    """Reconstruct an Architecture object from stored JSON data."""
+    components_data = data.get("components", [])
+    if not components_data or "entities" not in components_data[0]:
+        return None
+    components = [
+        Component(
+            name=c["name"],
+            responsibility=c.get("responsibility", ""),
+            entities=c.get("entities", []),
+        )
+        for c in components_data
+    ]
+    return Architecture(components=components, algorithm=data.get("algorithm", ""))
+
+
+def _run_a2a_comparison(baseline: dict, current: dict) -> dict | None:
+    """Run A2A comparison using arcade-agent's compare tool."""
+    arch_a = _reconstruct_architecture(baseline)
+    arch_b = _reconstruct_architecture(current)
+    if arch_a is None or arch_b is None:
+        return None
+    return compare(arch_a, arch_b)
 
 
 def build_comment(current: dict, baseline: dict | None, run_url: str = "") -> str:
@@ -54,20 +88,20 @@ def build_comment(current: dict, baseline: dict | None, run_url: str = "") -> st
     rci_icon = _rci_icon(cur_rci)
     quality_label = _quality_label(cur_rci)
 
-    lines.append("## 🤖 Architecture Analysis Summary\n")
+    lines.append("## \U0001f916 Architecture Analysis Summary\n")
     lines.append(
-        "_Powered by [arcade-agent](https://github.com/lemduc/arcade-agent) — "
+        "_Powered by [arcade-agent](https://github.com/lemduc/arcade-agent) \u2014 "
         "automatic architectural self-analysis_\n"
     )
     lines.append("---\n")
 
-    # ── Current state ──────────────────────────────────────────────────────────
-    lines.append("### 🏛️ Current Architecture\n")
+    # -- Current state -----------------------------------------------------------
+    lines.append("### \U0001f3db\ufe0f Current Architecture\n")
     lines.append("| Metric | Value |")
     lines.append("|--------|-------|")
-    lines.append(f"| 📦 Components | **{current.get('num_components')}** |")
-    lines.append(f"| 🧩 Entities | **{current.get('num_entities')}** |")
-    lines.append(f"| 🔗 Edges | **{current.get('num_edges')}** |")
+    lines.append(f"| \U0001f4e6 Components | **{current.get('num_components')}** |")
+    lines.append(f"| \U0001f9e9 Entities | **{current.get('num_entities')}** |")
+    lines.append(f"| \U0001f517 Edges | **{current.get('num_edges')}** |")
     lines.append(f"| RCI {rci_icon} | **{cur_rci:.4f}** ({quality_label}) |")
     lines.append(f"| TurboMQ | **{cur_tmq:.4f}** |")
     for name, val in cur_metrics.items():
@@ -75,17 +109,17 @@ def build_comment(current: dict, baseline: dict | None, run_url: str = "") -> st
             lines.append(f"| {name} | {val:.4f} |")
     lines.append("")
 
-    # ── Components ─────────────────────────────────────────────────────────────
+    # -- Components --------------------------------------------------------------
     if cur_components:
-        lines.append("<details><summary>🏗️ Components breakdown</summary>\n")
+        lines.append("<details><summary>\U0001f3d7\ufe0f Components breakdown</summary>\n")
         lines.append("| Component | Entities |")
         lines.append("|-----------|----------|")
         for comp in sorted(cur_components, key=lambda c: -c["num_entities"]):
             lines.append(f"| {comp['name']} | {comp['num_entities']} |")
         lines.append("</details>\n")
 
-    # ── Smells ─────────────────────────────────────────────────────────────────
-    lines.append("### 🚨 Architectural Smells\n")
+    # -- Smells ------------------------------------------------------------------
+    lines.append("### \U0001f6a8 Architectural Smells\n")
     if cur_smells:
         lines.append("| Severity | Type | Affected Components |")
         lines.append("|----------|------|---------------------|")
@@ -95,10 +129,10 @@ def build_comment(current: dict, baseline: dict | None, run_url: str = "") -> st
             comps = ", ".join(s.get("affected_components", []))
             lines.append(f"| {si} {s.get('severity','?')} | {stype} | {comps} |")
     else:
-        lines.append("✅ No architectural smells detected.")
+        lines.append("\u2705 No architectural smells detected.")
     lines.append("")
 
-    # ── Evolution (before/after) ───────────────────────────────────────────────
+    # -- Evolution (before/after) ------------------------------------------------
     if baseline:
         bl_metrics = baseline.get("metrics", {})
         bl_rci = bl_metrics.get("RCI", 0.0)
@@ -106,22 +140,73 @@ def build_comment(current: dict, baseline: dict | None, run_url: str = "") -> st
         bl_smells = baseline.get("smells", [])
         bl_commit = baseline.get("commit_sha", "unknown")[:7]
 
-        lines.append("### 📈 Evolution vs Baseline\n")
+        # Run A2A comparison via arcade-agent's compare tool
+        a2a_result = _run_a2a_comparison(baseline, current)
+
+        lines.append("### \U0001f4c8 Evolution vs Baseline\n")
         lines.append(f"_Baseline commit: `{bl_commit}`_\n")
+
+        # A2A similarity section
+        if a2a_result:
+            summary = a2a_result["summary"]
+            lines.append("#### Architecture-to-Architecture (A2A) Comparison\n")
+            lines.append("| Metric | Value |")
+            lines.append("|--------|-------|")
+            lines.append(f"| A2A Similarity | **{a2a_result['overall_similarity']:.4f}** |")
+            lines.append(f"| Matched Components | {summary['total_matches']} |")
+            lines.append(f"| Components Added | {summary['components_added']} |")
+            lines.append(f"| Components Removed | {summary['components_removed']} |")
+            if summary.get("possible_splits"):
+                lines.append(f"| Possible Splits | {summary['possible_splits']} |")
+            if summary.get("possible_merges"):
+                lines.append(f"| Possible Merges | {summary['possible_merges']} |")
+            lines.append("")
+
+            # Component-level matches detail
+            matches = a2a_result.get("matches", [])
+            matched = [m for m in matches if m.get("source") and m.get("target")]
+            added = [m for m in matches if not m.get("source")]
+            removed = [m for m in matches if not m.get("target")]
+
+            if matched or added or removed:
+                lines.append("<details><summary>Component matching details</summary>\n")
+                if matched:
+                    lines.append("**Matched:**")
+                    lines.append("| Baseline | Current | Similarity |")
+                    lines.append("|----------|---------|------------|")
+                    for m in sorted(matched, key=lambda x: -x["similarity"]):
+                        lines.append(
+                            f"| {m['source']} | {m['target']} | {m['similarity']:.4f} |"
+                        )
+                    lines.append("")
+                if added:
+                    lines.append("**New components:** " + ", ".join(
+                        f"`{m['target']}`" for m in added
+                    ))
+                    lines.append("")
+                if removed:
+                    lines.append("**Removed components:** " + ", ".join(
+                        f"`{m['source']}`" for m in removed
+                    ))
+                    lines.append("")
+                lines.append("</details>\n")
+
+        # Metric evolution table
+        lines.append("#### Metric Evolution\n")
         lines.append("| Metric | Baseline | Current | Change |")
         lines.append("|--------|----------|---------|--------|")
         lines.append(
-            f"| 📦 Components | {baseline.get('num_components')} "
+            f"| \U0001f4e6 Components | {baseline.get('num_components')} "
             f"| {current.get('num_components')} "
             f"| {_delta(current.get('num_components', 0), baseline.get('num_components', 0))} |"
         )
         lines.append(
-            f"| 🧩 Entities | {baseline.get('num_entities')} "
+            f"| \U0001f9e9 Entities | {baseline.get('num_entities')} "
             f"| {current.get('num_entities')} "
             f"| {_delta(current.get('num_entities', 0), baseline.get('num_entities', 0))} |"
         )
         lines.append(
-            f"| 🔗 Edges | {baseline.get('num_edges')} "
+            f"| \U0001f517 Edges | {baseline.get('num_edges')} "
             f"| {current.get('num_edges')} "
             f"| {_delta(current.get('num_edges', 0), baseline.get('num_edges', 0))} |"
         )
@@ -147,42 +232,53 @@ def build_comment(current: dict, baseline: dict | None, run_url: str = "") -> st
         if new_smells or resolved_smells:
             lines.append("**Smell changes:**")
             for t in new_smells:
-                lines.append(f"- 🆕 New smell: `{t}`")
+                lines.append(f"- \U0001f195 New smell: `{t}`")
             for t in resolved_smells:
-                lines.append(f"- ✅ Resolved: `{t}`")
+                lines.append(f"- \u2705 Resolved: `{t}`")
             lines.append("")
     else:
         lines.append(
-            "> ℹ️ No baseline available — this is the first analysis run or the "
+            "> \u2139\ufe0f No baseline available \u2014 this is the first analysis run or the "
             "baseline artifact has expired. The current results will be stored "
             "as the new baseline.\n"
         )
 
-    # ── CI/CD Insights ─────────────────────────────────────────────────────────
-    lines.append("### 💡 CI/CD Insights\n")
+    # -- CI/CD Insights ----------------------------------------------------------
+    lines.append("### \U0001f4a1 CI/CD Insights\n")
     lines.append(f"- **Quality Score**: {rci_icon} {quality_label} (RCI={cur_rci:.4f})")
 
     if baseline:
         bl_rci = baseline.get("metrics", {}).get("RCI", 0.0)
         rci_trend = cur_rci - bl_rci
         if rci_trend > 0.01:
-            trend = "📈 Improving modularity"
+            trend = "\U0001f4c8 Improving modularity"
         elif rci_trend < -0.01:
-            trend = "📉 Declining cohesion — consider reviewing recent refactoring"
+            trend = "\U0001f4c9 Declining cohesion \u2014 consider reviewing recent refactoring"
         else:
-            trend = "➡️ Stable architectural quality"
+            trend = "\u27a1\ufe0f Stable architectural quality"
         lines.append(f"- **Trend**: {trend}")
+
+        # A2A insight
+        a2a_result = _run_a2a_comparison(baseline, current)
+        if a2a_result:
+            sim = a2a_result["overall_similarity"]
+            if sim >= 0.9:
+                lines.append(f"- **Architecture Stability**: \U0001f7e2 High (A2A={sim:.4f})")
+            elif sim >= 0.7:
+                lines.append(f"- **Architecture Stability**: \U0001f7e1 Moderate (A2A={sim:.4f})")
+            else:
+                lines.append(f"- **Architecture Stability**: \U0001f534 Low (A2A={sim:.4f}) \u2014 significant restructuring detected")
 
     smell_count = len(cur_smells)
     if smell_count == 0:
-        lines.append("- **Smells**: ✅ Clean — no architectural smells")
+        lines.append("- **Smells**: \u2705 Clean \u2014 no architectural smells")
     elif smell_count <= 2:
-        lines.append(f"- **Smells**: ⚠️ {smell_count} smell(s) — review suggested")
+        lines.append(f"- **Smells**: \u26a0\ufe0f {smell_count} smell(s) \u2014 review suggested")
     else:
-        lines.append(f"- **Smells**: 🔴 {smell_count} smells — refactoring recommended")
+        lines.append(f"- **Smells**: \U0001f534 {smell_count} smells \u2014 refactoring recommended")
 
     if run_url:
-        lines.append(f"\n📄 [View full HTML report in CI artifacts]({run_url})")
+        lines.append(f"\n\U0001f4c4 [View full HTML report in CI artifacts]({run_url})")
 
     lines.append("\n---")
     lines.append(
@@ -223,7 +319,7 @@ def main() -> None:
             baseline = json.loads(bl_path.read_text())
             print(f"Loaded baseline from {bl_path}")
         else:
-            print(f"Baseline file not found: {bl_path} — running without baseline")
+            print(f"Baseline file not found: {bl_path} \u2014 running without baseline")
 
     comment = build_comment(current, baseline, run_url=args.run_url)
 
@@ -239,34 +335,51 @@ def main() -> None:
         bl_metrics = baseline.get("metrics", {})
         bl_rci = bl_metrics.get("RCI", 0.0)
         cur_rci = current.get("metrics", {}).get("RCI", 0.0)
+
+        # A2A comparison
+        a2a_result = _run_a2a_comparison(baseline, current)
+        if a2a_result:
+            summary = a2a_result["summary"]
+            print(f"  A2A Similarity: {a2a_result['overall_similarity']:.4f}")
+            print(
+                f"  Components:  {summary['arch_a_components']} \u2192 "
+                f"{summary['arch_b_components']} "
+                f"(+{summary['components_added']} / -{summary['components_removed']})"
+            )
+            if summary.get("possible_splits"):
+                print(f"  Possible Splits: {summary['possible_splits']}")
+            if summary.get("possible_merges"):
+                print(f"  Possible Merges: {summary['possible_merges']}")
+        else:
+            print(
+                f"  Components:  {baseline.get('num_components')} \u2192 "
+                f"{current.get('num_components')} "
+                f"{_delta(current.get('num_components', 0), baseline.get('num_components', 0))}"
+            )
+
         print(
-            f"  Components:  {baseline.get('num_components')} → "
-            f"{current.get('num_components')} "
-            f"{_delta(current.get('num_components', 0), baseline.get('num_components', 0))}"
-        )
-        print(
-            f"  Entities:    {baseline.get('num_entities')} → "
+            f"  Entities:    {baseline.get('num_entities')} \u2192 "
             f"{current.get('num_entities')} "
             f"{_delta(current.get('num_entities', 0), baseline.get('num_entities', 0))}"
         )
         print(
-            f"  Edges:       {baseline.get('num_edges')} → "
+            f"  Edges:       {baseline.get('num_edges')} \u2192 "
             f"{current.get('num_edges')} "
             f"{_delta(current.get('num_edges', 0), baseline.get('num_edges', 0))}"
         )
         print(
-            f"  RCI:         {bl_rci:.4f} → {cur_rci:.4f} {_delta(cur_rci, bl_rci)}"
+            f"  RCI:         {bl_rci:.4f} \u2192 {cur_rci:.4f} {_delta(cur_rci, bl_rci)}"
         )
         print(
-            f"  TurboMQ:     {bl_metrics.get('TurboMQ', 0):.4f} → "
+            f"  TurboMQ:     {bl_metrics.get('TurboMQ', 0):.4f} \u2192 "
             f"{current.get('metrics', {}).get('TurboMQ', 0):.4f} "
             f"{_delta(current.get('metrics', {}).get('TurboMQ', 0), bl_metrics.get('TurboMQ', 0))}"
         )
         cur_smell_count = len(current.get("smells", []))
         bl_smell_count = len(baseline.get("smells", []))
-        print(f"  Smells:      {bl_smell_count} → {cur_smell_count}")
+        print(f"  Smells:      {bl_smell_count} \u2192 {cur_smell_count}")
     else:
-        print("  No baseline available — first run or baseline expired.")
+        print("  No baseline available \u2014 first run or baseline expired.")
         cur_rci = current.get("metrics", {}).get("RCI", 0.0)
         print(f"  Components:  {current.get('num_components')}")
         print(f"  Entities:    {current.get('num_entities')}")
