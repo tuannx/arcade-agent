@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Compare current analysis results against a baseline and output Markdown.
 
+Uses arcade-agent's compare tool (A2A analysis with Hungarian algorithm) for
+proper architecture-to-architecture comparison when entity data is available.
+
 Usage:
     python scripts/compare_baseline.py current.json baseline.json [--output comment.md]
 
@@ -11,6 +14,12 @@ import argparse
 import json
 import sys
 from pathlib import Path
+
+# Ensure arcade_agent is importable from src/
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
+from arcade_agent.models.architecture import Architecture, Component
+from arcade_agent.tools.compare import compare
 
 
 def _delta(new: float, old: float) -> str:
@@ -41,6 +50,31 @@ def _quality_label(rci: float) -> str:
     return "Poor"
 
 
+def _reconstruct_architecture(data: dict) -> Architecture | None:
+    """Reconstruct an Architecture object from stored JSON data."""
+    components_data = data.get("components", [])
+    if not components_data or "entities" not in components_data[0]:
+        return None
+    components = [
+        Component(
+            name=c["name"],
+            responsibility=c.get("responsibility", ""),
+            entities=c.get("entities", []),
+        )
+        for c in components_data
+    ]
+    return Architecture(components=components, algorithm=data.get("algorithm", ""))
+
+
+def _run_a2a_comparison(baseline: dict, current: dict) -> dict | None:
+    """Run A2A comparison using arcade-agent's compare tool."""
+    arch_a = _reconstruct_architecture(baseline)
+    arch_b = _reconstruct_architecture(current)
+    if arch_a is None or arch_b is None:
+        return None
+    return compare(arch_a, arch_b)
+
+
 def build_comment(current: dict, baseline: dict | None, run_url: str = "") -> str:
     """Build a Markdown PR comment body."""
     lines: list[str] = []
@@ -61,7 +95,7 @@ def build_comment(current: dict, baseline: dict | None, run_url: str = "") -> st
     )
     lines.append("---\n")
 
-    # ── Current state ──────────────────────────────────────────────────────────
+    # -- Current state -----------------------------------------------------------
     lines.append("### 🏛️ Current Architecture\n")
     lines.append("| Metric | Value |")
     lines.append("|--------|-------|")
@@ -75,7 +109,7 @@ def build_comment(current: dict, baseline: dict | None, run_url: str = "") -> st
             lines.append(f"| {name} | {val:.4f} |")
     lines.append("")
 
-    # ── Components ─────────────────────────────────────────────────────────────
+    # -- Components --------------------------------------------------------------
     if cur_components:
         lines.append("<details><summary>🏗️ Components breakdown</summary>\n")
         lines.append("| Component | Entities |")
@@ -84,7 +118,7 @@ def build_comment(current: dict, baseline: dict | None, run_url: str = "") -> st
             lines.append(f"| {comp['name']} | {comp['num_entities']} |")
         lines.append("</details>\n")
 
-    # ── Smells ─────────────────────────────────────────────────────────────────
+    # -- Smells ------------------------------------------------------------------
     lines.append("### 🚨 Architectural Smells\n")
     if cur_smells:
         lines.append("| Severity | Type | Affected Components |")
@@ -98,7 +132,7 @@ def build_comment(current: dict, baseline: dict | None, run_url: str = "") -> st
         lines.append("✅ No architectural smells detected.")
     lines.append("")
 
-    # ── Evolution (before/after) ───────────────────────────────────────────────
+    # -- Evolution (before/after) ------------------------------------------------
     if baseline:
         bl_metrics = baseline.get("metrics", {})
         bl_rci = bl_metrics.get("RCI", 0.0)
@@ -106,8 +140,59 @@ def build_comment(current: dict, baseline: dict | None, run_url: str = "") -> st
         bl_smells = baseline.get("smells", [])
         bl_commit = baseline.get("commit_sha", "unknown")[:7]
 
+        # Run A2A comparison via arcade-agent's compare tool
+        a2a_result = _run_a2a_comparison(baseline, current)
+
         lines.append("### 📈 Evolution vs Baseline\n")
         lines.append(f"_Baseline commit: `{bl_commit}`_\n")
+
+        # A2A similarity section
+        if a2a_result:
+            summary = a2a_result["summary"]
+            lines.append("#### Architecture-to-Architecture (A2A) Comparison\n")
+            lines.append("| Metric | Value |")
+            lines.append("|--------|-------|")
+            lines.append(f"| A2A Similarity | **{a2a_result['overall_similarity']:.4f}** |")
+            lines.append(f"| Matched Components | {summary['total_matches']} |")
+            lines.append(f"| Components Added | {summary['components_added']} |")
+            lines.append(f"| Components Removed | {summary['components_removed']} |")
+            if summary.get("possible_splits"):
+                lines.append(f"| Possible Splits | {summary['possible_splits']} |")
+            if summary.get("possible_merges"):
+                lines.append(f"| Possible Merges | {summary['possible_merges']} |")
+            lines.append("")
+
+            # Component-level matches detail
+            matches = a2a_result.get("matches", [])
+            matched = [m for m in matches if m.get("source") and m.get("target")]
+            added = [m for m in matches if not m.get("source")]
+            removed = [m for m in matches if not m.get("target")]
+
+            if matched or added or removed:
+                lines.append("<details><summary>Component matching details</summary>\n")
+                if matched:
+                    lines.append("**Matched:**")
+                    lines.append("| Baseline | Current | Similarity |")
+                    lines.append("|----------|---------|------------|")
+                    for m in sorted(matched, key=lambda x: -x["similarity"]):
+                        lines.append(
+                            f"| {m['source']} | {m['target']} | {m['similarity']:.4f} |"
+                        )
+                    lines.append("")
+                if added:
+                    lines.append("**New components:** " + ", ".join(
+                        f"`{m['target']}`" for m in added
+                    ))
+                    lines.append("")
+                if removed:
+                    lines.append("**Removed components:** " + ", ".join(
+                        f"`{m['source']}`" for m in removed
+                    ))
+                    lines.append("")
+                lines.append("</details>\n")
+
+        # Metric evolution table
+        lines.append("#### Metric Evolution\n")
         lines.append("| Metric | Baseline | Current | Change |")
         lines.append("|--------|----------|---------|--------|")
         lines.append(
@@ -158,7 +243,7 @@ def build_comment(current: dict, baseline: dict | None, run_url: str = "") -> st
             "as the new baseline.\n"
         )
 
-    # ── CI/CD Insights ─────────────────────────────────────────────────────────
+    # -- CI/CD Insights ----------------------------------------------------------
     lines.append("### 💡 CI/CD Insights\n")
     lines.append(f"- **Quality Score**: {rci_icon} {quality_label} (RCI={cur_rci:.4f})")
 
@@ -172,6 +257,17 @@ def build_comment(current: dict, baseline: dict | None, run_url: str = "") -> st
         else:
             trend = "➡️ Stable architectural quality"
         lines.append(f"- **Trend**: {trend}")
+
+        # A2A insight
+        a2a_result = _run_a2a_comparison(baseline, current)
+        if a2a_result:
+            sim = a2a_result["overall_similarity"]
+            if sim >= 0.9:
+                lines.append(f"- **Architecture Stability**: 🟢 High (A2A={sim:.4f})")
+            elif sim >= 0.7:
+                lines.append(f"- **Architecture Stability**: 🟡 Moderate (A2A={sim:.4f})")
+            else:
+                lines.append(f"- **Architecture Stability**: 🔴 Low (A2A={sim:.4f}) — significant restructuring detected")
 
     smell_count = len(cur_smells)
     if smell_count == 0:
@@ -239,11 +335,28 @@ def main() -> None:
         bl_metrics = baseline.get("metrics", {})
         bl_rci = bl_metrics.get("RCI", 0.0)
         cur_rci = current.get("metrics", {}).get("RCI", 0.0)
-        print(
-            f"  Components:  {baseline.get('num_components')} → "
-            f"{current.get('num_components')} "
-            f"{_delta(current.get('num_components', 0), baseline.get('num_components', 0))}"
-        )
+
+        # A2A comparison
+        a2a_result = _run_a2a_comparison(baseline, current)
+        if a2a_result:
+            summary = a2a_result["summary"]
+            print(f"  A2A Similarity: {a2a_result['overall_similarity']:.4f}")
+            print(
+                f"  Components:  {summary['arch_a_components']} → "
+                f"{summary['arch_b_components']} "
+                f"(+{summary['components_added']} / -{summary['components_removed']})"
+            )
+            if summary.get("possible_splits"):
+                print(f"  Possible Splits: {summary['possible_splits']}")
+            if summary.get("possible_merges"):
+                print(f"  Possible Merges: {summary['possible_merges']}")
+        else:
+            print(
+                f"  Components:  {baseline.get('num_components')} → "
+                f"{current.get('num_components')} "
+                f"{_delta(current.get('num_components', 0), baseline.get('num_components', 0))}"
+            )
+
         print(
             f"  Entities:    {baseline.get('num_entities')} → "
             f"{current.get('num_entities')} "

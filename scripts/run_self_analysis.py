@@ -91,7 +91,12 @@ def main() -> None:
         "num_entities": graph.num_entities,
         "num_edges": graph.num_edges,
         "components": [
-            {"name": c.name, "num_entities": len(c.entities)}
+            {
+                "name": c.name,
+                "responsibility": c.responsibility,
+                "num_entities": len(c.entities),
+                "entities": c.entities,
+            }
             for c in arch.components
         ],
         "metrics": {m.name: round(m.value, 4) for m in metrics},
