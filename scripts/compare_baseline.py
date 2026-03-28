@@ -30,6 +30,29 @@ def _delta(new: float, old: float) -> str:
     return f"{arrow} ({diff:+.4f})"
 
 
+def _delta_with_impact(metric_name: str, new: float, old: float) -> str:
+    """Format delta using metric quality semantics, not raw direction."""
+    diff = new - old
+    if abs(diff) < 0.0001:
+        return "⚪ **→ (no change)**"
+
+    arrow = "↑" if diff > 0 else "↓"
+    better_when_higher = {"RCI", "TurboMQ", "BasicMQ"}
+    better_when_lower = {"InterConnectivity", "TwoWayPairRatio"}
+    low_impact = {"📦 Components", "🧩 Entities", "🔗 Edges", "IntraConnectivity"}
+
+    if metric_name in better_when_higher:
+        icon = "🟢" if diff > 0 else "🔴"
+    elif metric_name in better_when_lower:
+        icon = "🟢" if diff < 0 else "🔴"
+    elif metric_name in low_impact:
+        icon = "🟡"
+    else:
+        icon = "🟡"
+
+    return f"{icon} **{arrow} ({diff:+.4f})**"
+
+
 def _severity_icon(severity: str) -> str:
     return {"high": "🔴", "medium": "🟡", "low": "🟢"}.get(severity.lower(), "⚪")
 
@@ -95,6 +118,57 @@ def build_comment(current: dict, baseline: dict | None, run_url: str = "") -> st
     )
     lines.append("---\n")
 
+    # -- Metric evolution quick view (top) -------------------------------------
+    if baseline:
+        bl_metrics = baseline.get("metrics", {})
+        bl_rci = bl_metrics.get("RCI", 0.0)
+        bl_tmq = bl_metrics.get("TurboMQ", 0.0)
+        bl_commit = baseline.get("commit_sha", "unknown")[:7]
+        bl_components = baseline.get("num_components", 0)
+        cur_components_count = current.get("num_components", 0)
+        bl_entities = baseline.get("num_entities", 0)
+        cur_entities_count = current.get("num_entities", 0)
+        bl_edges = baseline.get("num_edges", 0)
+        cur_edges_count = current.get("num_edges", 0)
+
+        lines.append("### 📈 Metric Evolution\n")
+        lines.append(f"_Baseline commit: `{bl_commit}`_\n")
+        lines.append("_Legend: 🟢 better · 🔴 worse · 🟡 low impact · ⚪ no change_\n")
+        lines.append("| Metric | Baseline | Current | Change |")
+        lines.append("|--------|----------|---------|--------|")
+        lines.append(
+            f"| 📦 Components | {bl_components} "
+            f"| {cur_components_count} "
+            f"| {_delta_with_impact('📦 Components', cur_components_count, bl_components)} |"
+        )
+        lines.append(
+            f"| 🧩 Entities | {bl_entities} "
+            f"| {cur_entities_count} "
+            f"| {_delta_with_impact('🧩 Entities', cur_entities_count, bl_entities)} |"
+        )
+        lines.append(
+            f"| 🔗 Edges | {bl_edges} "
+            f"| {cur_edges_count} "
+            f"| {_delta_with_impact('🔗 Edges', cur_edges_count, bl_edges)} |"
+        )
+        lines.append(
+            f"| RCI | {bl_rci:.4f} | {cur_rci:.4f} "
+            f"| {_delta_with_impact('RCI', cur_rci, bl_rci)} |"
+        )
+        lines.append(
+            f"| TurboMQ | {bl_tmq:.4f} | {cur_tmq:.4f} "
+            f"| {_delta_with_impact('TurboMQ', cur_tmq, bl_tmq)} |"
+        )
+        for name in bl_metrics:
+            if name not in ("RCI", "TurboMQ"):
+                bl_v = bl_metrics.get(name, 0.0)
+                cur_v = cur_metrics.get(name, 0.0)
+                lines.append(
+                    f"| {name} | {bl_v:.4f} | {cur_v:.4f} "
+                    f"| {_delta_with_impact(name, cur_v, bl_v)} |"
+                )
+        lines.append("")
+
     # -- Current state -----------------------------------------------------------
     lines.append("### 🏛️ Current Architecture\n")
     lines.append("| Metric | Value |")
@@ -114,7 +188,10 @@ def build_comment(current: dict, baseline: dict | None, run_url: str = "") -> st
         lines.append("<details><summary>🏗️ Components breakdown</summary>\n")
         lines.append("| Component | Entities |")
         lines.append("|-----------|----------|")
-        for comp in sorted(cur_components, key=lambda c: -(c.get("num_entities") or len(c.get("entities", [])))):
+        for comp in sorted(
+            cur_components,
+            key=lambda c: -(c.get("num_entities") or len(c.get("entities", []))),
+        ):
             count = comp.get("num_entities") or len(comp.get("entities", []))
             lines.append(f"| {comp['name']} | {count} |")
         lines.append("</details>\n")
@@ -192,38 +269,6 @@ def build_comment(current: dict, baseline: dict | None, run_url: str = "") -> st
                     lines.append("")
                 lines.append("</details>\n")
 
-        # Metric evolution table
-        lines.append("#### Metric Evolution\n")
-        lines.append("| Metric | Baseline | Current | Change |")
-        lines.append("|--------|----------|---------|--------|")
-        lines.append(
-            f"| 📦 Components | {baseline.get('num_components')} "
-            f"| {current.get('num_components')} "
-            f"| {_delta(current.get('num_components', 0), baseline.get('num_components', 0))} |"
-        )
-        lines.append(
-            f"| 🧩 Entities | {baseline.get('num_entities')} "
-            f"| {current.get('num_entities')} "
-            f"| {_delta(current.get('num_entities', 0), baseline.get('num_entities', 0))} |"
-        )
-        lines.append(
-            f"| 🔗 Edges | {baseline.get('num_edges')} "
-            f"| {current.get('num_edges')} "
-            f"| {_delta(current.get('num_edges', 0), baseline.get('num_edges', 0))} |"
-        )
-        lines.append(
-            f"| RCI | {bl_rci:.4f} | {cur_rci:.4f} | {_delta(cur_rci, bl_rci)} |"
-        )
-        lines.append(
-            f"| TurboMQ | {bl_tmq:.4f} | {cur_tmq:.4f} | {_delta(cur_tmq, bl_tmq)} |"
-        )
-        for name in bl_metrics:
-            if name not in ("RCI", "TurboMQ"):
-                bl_v = bl_metrics.get(name, 0.0)
-                cur_v = cur_metrics.get(name, 0.0)
-                lines.append(f"| {name} | {bl_v:.4f} | {cur_v:.4f} | {_delta(cur_v, bl_v)} |")
-        lines.append("")
-
         # Smell changes
         cur_smell_types = {s.get("smell_type") for s in cur_smells}
         bl_smell_types = {s.get("smell_type") for s in bl_smells}
@@ -269,7 +314,10 @@ def build_comment(current: dict, baseline: dict | None, run_url: str = "") -> st
             elif sim >= 0.7:
                 lines.append(f"- **Architecture Stability**: 🟡 Moderate (A2A={sim:.4f})")
             else:
-                lines.append(f"- **Architecture Stability**: 🔴 Low (A2A={sim:.4f}) — significant restructuring detected")
+                lines.append(
+                    f"- **Architecture Stability**: 🔴 Low (A2A={sim:.4f}) "
+                    "— significant restructuring detected"
+                )
 
     smell_count = len(cur_smells)
     if smell_count == 0:
