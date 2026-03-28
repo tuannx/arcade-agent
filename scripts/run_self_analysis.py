@@ -17,6 +17,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from arcade_agent.algorithms.smells import SmellInstance
+from arcade_agent.parsers.graph import DependencyGraph
 from arcade_agent.tools.compute_metrics import compute_metrics
 from arcade_agent.tools.detect_smells import detect_smells
 from arcade_agent.tools.ingest import ingest
@@ -36,6 +37,43 @@ def _smell_to_dict(smell: SmellInstance) -> dict:
     return d
 
 
+def _filter_non_architectural_entities(graph: DependencyGraph) -> DependencyGraph:
+    """Remove low-signal helper entities from self-analysis.
+
+    The repository self-analysis is meant to approximate architectural units, not
+    every internal helper. Private Python top-level helper functions inflate
+    component size and smell counts without representing stable architectural
+    responsibilities, so exclude them from the self-analysis graph only.
+    """
+    kept_entities = {
+        fqn: entity
+        for fqn, entity in graph.entities.items()
+        if not (
+            entity.language == "python"
+            and entity.kind == "function"
+            and entity.name.startswith("_")
+        )
+    }
+
+    kept_edges = [
+        edge
+        for edge in graph.edges
+        if edge.source in kept_entities and edge.target in kept_entities
+    ]
+
+    kept_packages: dict[str, list[str]] = {}
+    for pkg, fqns in graph.packages.items():
+        filtered_fqns = [fqn for fqn in fqns if fqn in kept_entities]
+        if filtered_fqns:
+            kept_packages[pkg] = filtered_fqns
+
+    return DependencyGraph(
+        entities=kept_entities,
+        edges=kept_edges,
+        packages=kept_packages,
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Self-analysis of arcade-agent codebase")
     parser.add_argument(
@@ -52,6 +90,12 @@ def main() -> None:
         "--algorithm",
         default="pkg",
         help="Architecture recovery algorithm (pkg, wca, acdc)",
+    )
+    parser.add_argument(
+        "--num-clusters",
+        type=int,
+        default=None,
+        help="Target cluster count for clustering algorithms such as wca.",
     )
     args = parser.parse_args()
 
@@ -71,10 +115,11 @@ def main() -> None:
         language=repo.language,
         files=[str(f) for f in repo.source_files],
     )
+    graph = _filter_non_architectural_entities(graph)
     print(f"  {graph.num_entities} entities, {graph.num_edges} edges")
 
     print(f"[3/5] Recovering architecture ({args.algorithm})...")
-    arch = recover(graph, algorithm=args.algorithm)
+    arch = recover(graph, algorithm=args.algorithm, num_clusters=args.num_clusters)
     print(f"  {len(arch.components)} components recovered")
 
     print("[4/5] Detecting smells and computing metrics...")
