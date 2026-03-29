@@ -93,6 +93,84 @@ def _delta_class(new: float, old: float) -> str:
     return "delta-positive" if diff > 0 else "delta-negative"
 
 
+def _summary_stat_values(
+    current: dict,
+    baseline: dict | None,
+    key: str,
+    *,
+    current_fallback_key: str | None = None,
+    baseline_fallback_key: str | None = None,
+    default: int = 0,
+) -> tuple[int | None, int]:
+    """Return schema-aware baseline/current values for summary statistics."""
+    current_value = current.get(key)
+    if current_value is None and current_fallback_key:
+        current_value = current.get(current_fallback_key, default)
+    if current_value is None:
+        current_value = default
+
+    if not baseline:
+        return default, int(current_value)
+
+    baseline_value = baseline.get(key)
+    if baseline_value is None and baseline_fallback_key:
+        baseline_value = baseline.get(baseline_fallback_key)
+
+    return (None if baseline_value is None else int(baseline_value), int(current_value))
+
+
+def _build_summary_metric_row(name: str, baseline_value: int | None, current_value: int) -> dict:
+    """Build a metric row while preserving missing baseline schema values."""
+    if baseline_value is None:
+        return {
+            "name": name,
+            "baseline": "n/a",
+            "current": current_value,
+            "delta": "new in schema",
+            "delta_class": "delta-neutral",
+        }
+
+    return {
+        "name": name,
+        "baseline": baseline_value,
+        "current": current_value,
+        "delta": _numeric_delta(current_value, baseline_value),
+        "delta_class": _delta_class(current_value, baseline_value),
+    }
+
+
+def _impact_delta_with_optional_baseline(
+    metric_name: str,
+    current_value: float,
+    baseline_value: float | None,
+) -> str:
+    """Format a delta while preserving unknown baseline values."""
+    if baseline_value is None:
+        return "⚪ **new in schema**"
+    return _delta_with_impact(metric_name, current_value, baseline_value)
+
+
+def _component_metric_transition(
+    source: dict | None,
+    target: dict | None,
+    key: str,
+) -> str:
+    """Format component-level metric changes while preserving missing schema values."""
+    source_has_value = source is not None and key in source
+    target_has_value = target is not None and key in target
+    source_value = int(source.get(key, 0)) if source and source_has_value else 0
+    target_value = int(target.get(key, 0)) if target and target_has_value else 0
+
+    if source is not None and target is not None and not source_has_value and target_has_value:
+        return f"n/a → {target_value} (new in schema)"
+    if source is not None and target is None and not source_has_value:
+        return "n/a → 0"
+    if source is None and target is not None and not target_has_value:
+        return "0 → n/a"
+
+    return f"{source_value} → {target_value} ({_numeric_delta(target_value, source_value)})"
+
+
 def _component_count(component: dict, key: str) -> int:
     return int(component.get(key, 0))
 
@@ -276,40 +354,26 @@ def _build_metric_rows(current: dict, baseline: dict | None) -> list[dict]:
     metric_rows = []
     baseline_metrics = baseline.get("metrics", {}) if baseline else {}
     current_metrics = current.get("metrics", {})
-    baseline_num_components = baseline.get("num_components", 0) if baseline else 0
-    baseline_num_entities = baseline.get("num_entities", 0) if baseline else 0
-    baseline_num_edges = baseline.get("num_edges", 0) if baseline else 0
-    baseline_source_entities = (
-        baseline.get("source_num_entities", baseline.get("num_entities", 0))
-        if baseline
-        else 0
-    )
-    baseline_class_count = baseline.get("class_count", 0) if baseline else 0
-    baseline_function_count = baseline.get("function_count", 0) if baseline else 0
-    baseline_method_count = baseline.get("method_count", 0) if baseline else 0
-
     summary_rows = [
-        ("Components", baseline_num_components, current.get("num_components", 0)),
-        ("Analysis Entities", baseline_num_entities, current.get("num_entities", 0)),
-        ("Dependencies", baseline_num_edges, current.get("num_edges", 0)),
+        ("Components",) + _summary_stat_values(current, baseline, "num_components"),
+        ("Analysis Entities",) + _summary_stat_values(current, baseline, "num_entities"),
+        ("Dependencies",) + _summary_stat_values(current, baseline, "num_edges"),
         (
             "Source Entities",
-            baseline_source_entities,
-            current.get("source_num_entities", current.get("num_entities", 0)),
+        ) + _summary_stat_values(
+            current,
+            baseline,
+            "source_num_entities",
+            current_fallback_key="num_entities",
+            baseline_fallback_key="num_entities",
         ),
-        ("Classes", baseline_class_count, current.get("class_count", 0)),
-        ("Functions", baseline_function_count, current.get("function_count", 0)),
-        ("Methods", baseline_method_count, current.get("method_count", 0)),
+        ("Classes",) + _summary_stat_values(current, baseline, "class_count"),
+        ("Functions",) + _summary_stat_values(current, baseline, "function_count"),
+        ("Methods",) + _summary_stat_values(current, baseline, "method_count"),
     ]
 
     for name, old, new in summary_rows:
-        metric_rows.append({
-            "name": name,
-            "baseline": old,
-            "current": new,
-            "delta": _numeric_delta(new, old),
-            "delta_class": _delta_class(new, old),
-        })
+        metric_rows.append(_build_summary_metric_row(name, old, new))
 
     metric_names = sorted(set(baseline_metrics) | set(current_metrics))
     for name in metric_names:
@@ -367,10 +431,6 @@ def _build_component_rows(
                 target = current_map[target_name]
                 source_entities = _component_size(source)
                 target_entities = _component_size(target)
-                source_classes = _component_count(source, "class_count")
-                target_classes = _component_count(target, "class_count")
-                source_methods = _component_count(source, "method_count")
-                target_methods = _component_count(target, "method_count")
                 rows.append({
                     "status": "matched",
                     "baseline_name": source_name,
@@ -381,12 +441,10 @@ def _build_component_rows(
                         f"({_numeric_delta(target_entities, source_entities)})"
                     ),
                     "classes": (
-                        f"{source_classes} → {target_classes} "
-                        f"({_numeric_delta(target_classes, source_classes)})"
+                        _component_metric_transition(source, target, "class_count")
                     ),
                     "methods": (
-                        f"{source_methods} → {target_methods} "
-                        f"({_numeric_delta(target_methods, source_methods)})"
+                        _component_metric_transition(source, target, "method_count")
                     ),
                 })
                 matched_names.add(source_name)
@@ -411,8 +469,8 @@ def _build_component_rows(
                     "current_name": "-",
                     "similarity": "-",
                     "entities": f"{_component_size(source)} → 0",
-                    "classes": f"{_component_count(source, 'class_count')} → 0",
-                    "methods": f"{_component_count(source, 'method_count')} → 0",
+                    "classes": _component_metric_transition(source, None, "class_count"),
+                    "methods": _component_metric_transition(source, None, "method_count"),
                 })
                 matched_names.add(source_name)
 
@@ -672,34 +730,44 @@ def build_comment(current: dict, baseline: dict | None, run_url: str = "") -> st
             f"| {cur_edges_count} "
             f"| {_delta_with_impact('🔗 Edges', cur_edges_count, bl_edges)} |"
         )
-        class_delta = _delta_with_impact(
-            '🧩 Entities',
-            current.get('class_count', 0),
-            baseline.get('class_count', 0),
+        baseline_class_count, current_class_count = _summary_stat_values(
+            current, baseline, 'class_count'
         )
-        function_delta = _delta_with_impact(
-            '🧩 Entities',
-            current.get('function_count', 0),
-            baseline.get('function_count', 0),
+        baseline_function_count, current_function_count = _summary_stat_values(
+            current, baseline, 'function_count'
         )
-        method_delta = _delta_with_impact(
-            '🧩 Entities',
-            current.get('method_count', 0),
-            baseline.get('method_count', 0),
+        baseline_method_count, current_method_count = _summary_stat_values(
+            current, baseline, 'method_count'
+        )
+        class_delta = _impact_delta_with_optional_baseline(
+            '🧩 Entities', current_class_count, baseline_class_count
+        )
+        function_delta = _impact_delta_with_optional_baseline(
+            '🧩 Entities', current_function_count, baseline_function_count
+        )
+        method_delta = _impact_delta_with_optional_baseline(
+            '🧩 Entities', current_method_count, baseline_method_count
+        )
+        baseline_class_display = baseline_class_count if baseline_class_count is not None else 'n/a'
+        baseline_function_display = (
+            baseline_function_count if baseline_function_count is not None else 'n/a'
+        )
+        baseline_method_display = (
+            baseline_method_count if baseline_method_count is not None else 'n/a'
         )
         lines.append(
-            f"| 🏷️ Classes | {baseline.get('class_count', 0)} | "
-            f"{current.get('class_count', 0)} | "
+            f"| 🏷️ Classes | {baseline_class_display} | "
+            f"{current_class_count} | "
             f"{class_delta} |"
         )
         lines.append(
-            f"| ƒ Functions | {baseline.get('function_count', 0)} | "
-            f"{current.get('function_count', 0)} | "
+            f"| ƒ Functions | {baseline_function_display} | "
+            f"{current_function_count} | "
             f"{function_delta} |"
         )
         lines.append(
-            f"| 🔧 Methods | {baseline.get('method_count', 0)} | "
-            f"{current.get('method_count', 0)} | "
+            f"| 🔧 Methods | {baseline_method_display} | "
+            f"{current_method_count} | "
             f"{method_delta} |"
         )
         lines.append(

@@ -99,3 +99,25 @@ def test_build_report_payload_uses_repo_name_from_snapshot():
     report = build_report_payload(current, baseline)
 
     assert report["repo_name"] == "independent-framework"
+
+
+def test_build_report_payload_marks_new_schema_counts_without_fake_zero_baseline():
+    baseline = _snapshot("abc1234", "Core", 1, 1)
+    baseline.pop("class_count")
+    baseline.pop("function_count")
+    baseline.pop("method_count")
+    baseline["components"][0].pop("class_count")
+    baseline["components"][0].pop("function_count")
+    baseline["components"][0].pop("method_count")
+
+    current = _snapshot("def5678", "Core", 2, 3)
+
+    report = build_report_payload(current, baseline)
+    metric_rows = {row["name"]: row for row in report["metric_rows"]}
+
+    assert metric_rows["Classes"]["baseline"] == "n/a"
+    assert metric_rows["Classes"]["delta"] == "new in schema"
+    assert metric_rows["Methods"]["baseline"] == "n/a"
+    assert metric_rows["Methods"]["delta"] == "new in schema"
+    assert report["component_rows"][0]["classes"] == "n/a → 2 (new in schema)"
+    assert report["component_rows"][0]["methods"] == "n/a → 3 (new in schema)"
