@@ -14,6 +14,7 @@ assert _COMPARE_BASELINE_SPEC and _COMPARE_BASELINE_SPEC.loader
 _COMPARE_BASELINE_MODULE = importlib.util.module_from_spec(_COMPARE_BASELINE_SPEC)
 _COMPARE_BASELINE_SPEC.loader.exec_module(_COMPARE_BASELINE_MODULE)
 build_report_payload = _COMPARE_BASELINE_MODULE.build_report_payload
+build_comment = _COMPARE_BASELINE_MODULE.build_comment
 
 
 def _snapshot(commit_sha: str, component_name: str, classes: int, methods: int) -> dict:
@@ -121,3 +122,18 @@ def test_build_report_payload_marks_new_schema_counts_without_fake_zero_baseline
     assert metric_rows["Methods"]["delta"] == "new in schema"
     assert report["component_rows"][0]["classes"] == "n/a → 2 (new in schema)"
     assert report["component_rows"][0]["methods"] == "n/a → 3 (new in schema)"
+
+
+def test_build_comment_includes_baseline_transition_note_when_provided():
+    current = _snapshot("def5678", "Core", 1, 2)
+
+    comment = build_comment(
+        current,
+        None,
+        baseline_note=(
+            "Improvement tracking is temporarily unavailable because the baseline "
+            "algorithm changed."
+        ),
+    )
+
+    assert "Improvement tracking is temporarily unavailable" in comment

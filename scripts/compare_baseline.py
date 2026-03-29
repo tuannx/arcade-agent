@@ -517,7 +517,12 @@ def _build_dependency_rows(current: dict, baseline: dict | None) -> list[dict]:
     return rows
 
 
-def build_report_payload(current: dict, baseline: dict | None, run_url: str = "") -> dict:
+def build_report_payload(
+    current: dict,
+    baseline: dict | None,
+    run_url: str = "",
+    baseline_note: str = "",
+) -> dict:
     """Build a unified before/after comparison payload."""
     baseline = _normalize_snapshot(baseline)
     current = _normalize_snapshot(current)
@@ -544,6 +549,7 @@ def build_report_payload(current: dict, baseline: dict | None, run_url: str = ""
         "component_rows": _build_component_rows(current, baseline, a2a_result),
         "dependency_rows": _build_dependency_rows(current, baseline),
         "run_url": run_url,
+        "baseline_note": baseline_note,
     }
 
 
@@ -580,6 +586,9 @@ def _write_step_summary(path: Path, report: dict) -> None:
     lines.append("```mermaid")
     lines.append(build_snapshot_mermaid(current))
     lines.append("```")
+
+    if report.get("baseline_note"):
+        lines.append(f"\n> {report['baseline_note']}")
 
     if baseline:
         lines.append("\n## 🔄 Evolution Vs Baseline\n")
@@ -674,11 +683,21 @@ def _run_a2a_comparison(baseline: dict, current: dict) -> dict | None:
     return compare(arch_a, arch_b)
 
 
-def build_comment(current: dict, baseline: dict | None, run_url: str = "") -> str:
+def build_comment(
+    current: dict,
+    baseline: dict | None,
+    run_url: str = "",
+    baseline_note: str = "",
+) -> str:
     """Build a Markdown PR comment body."""
     lines: list[str] = []
 
-    report = build_report_payload(current, baseline, run_url=run_url)
+    report = build_report_payload(
+        current,
+        baseline,
+        run_url=run_url,
+        baseline_note=baseline_note,
+    )
     current = report["current"]
     baseline = report.get("baseline")
     cur_metrics = current.get("metrics", {})
@@ -696,6 +715,9 @@ def build_comment(current: dict, baseline: dict | None, run_url: str = "") -> st
         "automatic architectural self-analysis_\n"
     )
     lines.append("---\n")
+
+    if report.get("baseline_note"):
+        lines.append(f"> {report['baseline_note']}\n")
 
     # -- Metric evolution quick view (top) -------------------------------------
     if baseline:
@@ -1025,6 +1047,11 @@ def main() -> None:
         default="",
         help="Optional output path for the generated HTML comparison report",
     )
+    parser.add_argument(
+        "--baseline-note",
+        default="",
+        help="Optional note explaining why baseline comparison is unavailable or partial",
+    )
     args = parser.parse_args()
 
     current_path = Path(args.current)
@@ -1047,8 +1074,18 @@ def main() -> None:
         else:
             print(f"Baseline file not found: {bl_path} — running without baseline")
 
-    report = build_report_payload(current, baseline, run_url=args.run_url)
-    comment = build_comment(current, baseline, run_url=args.run_url)
+    report = build_report_payload(
+        current,
+        baseline,
+        run_url=args.run_url,
+        baseline_note=args.baseline_note,
+    )
+    comment = build_comment(
+        current,
+        baseline,
+        run_url=args.run_url,
+        baseline_note=args.baseline_note,
+    )
 
     out = Path(args.output)
     out.write_text(comment)
