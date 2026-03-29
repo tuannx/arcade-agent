@@ -17,6 +17,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from arcade_agent.algorithms.smells import SmellInstance
+from arcade_agent.exporters.json import build_component_summary, build_graph_summary
 from arcade_agent.parsers.graph import DependencyGraph
 from arcade_agent.tools.compute_metrics import compute_metrics
 from arcade_agent.tools.detect_smells import detect_smells
@@ -48,7 +49,8 @@ def _filter_non_architectural_entities(graph: DependencyGraph) -> DependencyGrap
     kept_entities = {
         fqn: entity
         for fqn, entity in graph.entities.items()
-        if not (
+        if entity.kind != "method"
+        and not (
             entity.language == "python"
             and entity.kind == "function"
             and entity.name.startswith("_")
@@ -110,12 +112,12 @@ def main() -> None:
         sys.exit(1)
 
     print("[2/5] Parsing dependencies...")
-    graph = parse(
+    raw_graph = parse(
         str(repo.path),
         language=repo.language,
         files=[str(f) for f in repo.source_files],
     )
-    graph = _filter_non_architectural_entities(graph)
+    graph = _filter_non_architectural_entities(raw_graph)
     print(f"  {graph.num_entities} entities, {graph.num_edges} edges")
 
     print(f"[3/5] Recovering architecture ({args.algorithm})...")
@@ -127,6 +129,7 @@ def main() -> None:
     metrics = compute_metrics(arch, graph)
 
     print("[5/5] Saving results...")
+    source_summary = build_graph_summary(raw_graph)
     results = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "commit_sha": os.environ.get("GITHUB_SHA", "local"),
@@ -135,13 +138,17 @@ def main() -> None:
         "num_components": len(arch.components),
         "num_entities": graph.num_entities,
         "num_edges": graph.num_edges,
+        "source_num_entities": source_summary["num_entities"],
+        "class_count": source_summary["class_count"],
+        "function_count": source_summary["function_count"],
+        "method_count": source_summary["method_count"],
+        "entity_kind_counts": source_summary["entity_kind_counts"],
+        "component_dependencies": [
+            {"source": source, "target": target}
+            for source, target in arch.component_dependencies(graph)
+        ],
         "components": [
-            {
-                "name": c.name,
-                "responsibility": c.responsibility,
-                "num_entities": len(c.entities),
-                "entities": c.entities,
-            }
+            build_component_summary(c, graph, stats_graph=raw_graph)
             for c in arch.components
         ],
         "metrics": {m.name: round(m.value, 4) for m in metrics},

@@ -128,6 +128,7 @@ jobs:
             arcade_analysis_results.json \
             $BASELINE_ARG \
             --output pr_comment.md \
+            --output-html arcade_analysis_comparison.html \
             --run-url "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
       # ── 5. Upload HTML report + JSON as CI artifact ────────────────────────
@@ -137,7 +138,9 @@ jobs:
           name: arcade-agent-self-analysis
           path: |
             arcade_analysis_report.html
+            arcade_analysis_comparison.html
             arcade_analysis_results.json
+            pr_comment.md
           retention-days: 30
 
       # ── 6. Store baseline artifact (only on main-branch pushes) ───────────

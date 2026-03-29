@@ -1,5 +1,7 @@
 """Tests for the recover tool."""
 
+import pytest
+
 from arcade_agent.tools.recover import recover
 
 
@@ -31,6 +33,5 @@ def test_acdc_recovery(sample_graph):
 
 
 def test_unknown_algorithm(sample_graph):
-    import pytest
     with pytest.raises(ValueError, match="Unknown algorithm"):
         recover(sample_graph, algorithm="unknown")

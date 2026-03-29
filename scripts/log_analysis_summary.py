@@ -31,6 +31,10 @@ def _quality_label(rci: float) -> str:
     return "Poor"
 
 
+def _component_count(component: dict) -> int:
+    return component.get("num_entities") or len(component.get("entities", []))
+
+
 def main() -> None:
     if len(sys.argv) < 2:
         print("Usage: log_analysis_summary.py <results.json>")
@@ -60,6 +64,9 @@ def main() -> None:
     print(f"│{'':2}{'📦 Components':20} {r.get('num_components', '?'):<10}{'':29}│")
     print(f"│{'':2}{'🧩 Entities':20} {r.get('num_entities', '?'):<10}{'':29}│")
     print(f"│{'':2}{'🔗 Edges':20} {r.get('num_edges', '?'):<10}{'':29}│")
+    print(f"│{'':2}{'🏷️ Classes':20} {r.get('class_count', 0):<10}{'':29}│")
+    print(f"│{'':2}{'ƒ Functions':20} {r.get('function_count', 0):<10}{'':29}│")
+    print(f"│{'':2}{'🔧 Methods':20} {r.get('method_count', 0):<10}{'':29}│")
     print(f"├{border}┤")
 
     # Metrics
@@ -77,10 +84,13 @@ def main() -> None:
     # Components
     print(f"│{'🏗️  COMPONENTS':^{width}}│")
     print(f"├{border}┤")
-    for comp in sorted(components, key=lambda c: -(c.get("num_entities") or len(c.get("entities", [])))):
-        count = comp.get("num_entities") or len(comp.get("entities", []))
+    for comp in sorted(components, key=lambda c: (-_component_count(c), c["name"])):
+        count = _component_count(comp)
         bar = "█" * min(count // 3, 20)
-        line = f"  {comp['name']:<22} {count:>3} entities  {bar}"
+        line = (
+            f"  {comp['name']:<18} {count:>3} ent  "
+            f"{comp.get('class_count', 0):>2} cls  {comp.get('method_count', 0):>2} mth  {bar}"
+        )
         print(f"│{line:<{width}}│")
     print(f"├{border}┤")
 
@@ -126,6 +136,9 @@ def _write_step_summary(
         f"| 📦 Components | {r.get('num_components')} |",
         f"| 🧩 Entities | {r.get('num_entities')} |",
         f"| 🔗 Edges | {r.get('num_edges')} |",
+        f"| 🏷️ Classes | {r.get('class_count', 0)} |",
+        f"| ƒ Functions | {r.get('function_count', 0)} |",
+        f"| 🔧 Methods | {r.get('method_count', 0)} |",
         f"| RCI {icon} | {rci:.4f} ({label}) |",
         f"| TurboMQ | {turbo_mq:.4f} |",
     ]
@@ -134,11 +147,14 @@ def _write_step_summary(
             lines.append(f"| {name} | {val:.4f} |")
 
     lines.append("\n### 🏗️ Components\n")
-    lines.append("| Component | Entities |")
-    lines.append("|-----------|----------|")
-    for comp in sorted(components, key=lambda c: -(c.get("num_entities") or len(c.get("entities", [])))):
-        count = comp.get("num_entities") or len(comp.get("entities", []))
-        lines.append(f"| {comp['name']} | {count} |")
+    lines.append("| Component | Entities | Classes | Methods |")
+    lines.append("|-----------|----------|---------|---------|")
+    for comp in sorted(components, key=lambda c: (-_component_count(c), c["name"])):
+        count = _component_count(comp)
+        lines.append(
+            f"| {comp['name']} | {count} | {comp.get('class_count', 0)} | "
+            f"{comp.get('method_count', 0)} |"
+        )
 
     lines.append("\n### 🚨 Architectural Smells\n")
     if smells:

@@ -12,6 +12,7 @@ Exits with code 0 always (comparison is informational, not a pass/fail gate).
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -19,6 +20,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from arcade_agent.algorithms.architecture import Architecture, Component
+from arcade_agent.exporters.html import export_evolution_html
 from arcade_agent.tools.compare import compare
 
 
@@ -73,6 +75,290 @@ def _quality_label(rci: float) -> str:
     return "Poor"
 
 
+def _numeric_delta(new: float, old: float) -> str:
+    diff = new - old
+    if abs(diff) < 0.0001:
+        return "0"
+    sign = "+" if diff > 0 else ""
+    if float(diff).is_integer():
+        return f"{sign}{int(diff)}"
+    return f"{sign}{diff:.4f}"
+
+
+def _delta_class(new: float, old: float) -> str:
+    diff = new - old
+    if abs(diff) < 0.0001:
+        return "delta-neutral"
+    return "delta-positive" if diff > 0 else "delta-negative"
+
+
+def _component_count(component: dict, key: str) -> int:
+    return int(component.get(key, 0))
+
+
+def _component_size(component: dict) -> int:
+    return int(component.get("num_entities") or len(component.get("entities", [])))
+
+
+def _component_map(data: dict | None) -> dict[str, dict]:
+    if not data:
+        return {}
+    return {component["name"]: component for component in data.get("components", [])}
+
+
+def _dependency_set(data: dict | None) -> set[tuple[str, str]]:
+    if not data:
+        return set()
+    return {
+        (dep["source"], dep["target"])
+        for dep in data.get("component_dependencies", [])
+    }
+
+
+def _build_metric_rows(current: dict, baseline: dict | None) -> list[dict]:
+    metric_rows = []
+    baseline_metrics = baseline.get("metrics", {}) if baseline else {}
+    current_metrics = current.get("metrics", {})
+    baseline_num_components = baseline.get("num_components", 0) if baseline else 0
+    baseline_num_entities = baseline.get("num_entities", 0) if baseline else 0
+    baseline_num_edges = baseline.get("num_edges", 0) if baseline else 0
+    baseline_source_entities = (
+        baseline.get("source_num_entities", baseline.get("num_entities", 0))
+        if baseline
+        else 0
+    )
+    baseline_class_count = baseline.get("class_count", 0) if baseline else 0
+    baseline_function_count = baseline.get("function_count", 0) if baseline else 0
+    baseline_method_count = baseline.get("method_count", 0) if baseline else 0
+
+    summary_rows = [
+        ("Components", baseline_num_components, current.get("num_components", 0)),
+        ("Analysis Entities", baseline_num_entities, current.get("num_entities", 0)),
+        ("Dependencies", baseline_num_edges, current.get("num_edges", 0)),
+        (
+            "Source Entities",
+            baseline_source_entities,
+            current.get("source_num_entities", current.get("num_entities", 0)),
+        ),
+        ("Classes", baseline_class_count, current.get("class_count", 0)),
+        ("Functions", baseline_function_count, current.get("function_count", 0)),
+        ("Methods", baseline_method_count, current.get("method_count", 0)),
+    ]
+
+    for name, old, new in summary_rows:
+        metric_rows.append({
+            "name": name,
+            "baseline": old,
+            "current": new,
+            "delta": _numeric_delta(new, old),
+            "delta_class": _delta_class(new, old),
+        })
+
+    metric_names = sorted(set(baseline_metrics) | set(current_metrics))
+    for name in metric_names:
+        old = baseline_metrics.get(name, 0.0)
+        new = current_metrics.get(name, 0.0)
+        metric_rows.append({
+            "name": name,
+            "baseline": f"{old:.4f}",
+            "current": f"{new:.4f}",
+            "delta": _numeric_delta(new, old),
+            "delta_class": _delta_class(new, old),
+        })
+
+    return metric_rows
+
+
+def _build_component_rows(
+    current: dict,
+    baseline: dict | None,
+    a2a_result: dict | None,
+) -> list[dict]:
+    current_map = _component_map(current)
+    baseline_map = _component_map(baseline)
+    rows: list[dict] = []
+
+    if not baseline:
+        for component in sorted(
+            current_map.values(),
+            key=lambda comp: (-_component_size(comp), comp["name"]),
+        ):
+            rows.append({
+                "status": "added",
+                "baseline_name": "-",
+                "current_name": component["name"],
+                "similarity": "-",
+                "entities": f"0 → {_component_size(component)}",
+                "classes": f"0 → {_component_count(component, 'class_count')}",
+                "methods": f"0 → {_component_count(component, 'method_count')}",
+            })
+        return rows
+
+    matched_names: set[str] = set()
+    if a2a_result:
+        for match in a2a_result.get("matches", []):
+            source_name = match.get("source")
+            target_name = match.get("target")
+            if source_name and target_name:
+                source = baseline_map[source_name]
+                target = current_map[target_name]
+                source_entities = _component_size(source)
+                target_entities = _component_size(target)
+                source_classes = _component_count(source, "class_count")
+                target_classes = _component_count(target, "class_count")
+                source_methods = _component_count(source, "method_count")
+                target_methods = _component_count(target, "method_count")
+                rows.append({
+                    "status": "matched",
+                    "baseline_name": source_name,
+                    "current_name": target_name,
+                    "similarity": f"{match['similarity']:.4f}",
+                    "entities": (
+                        f"{source_entities} → {target_entities} "
+                        f"({_numeric_delta(target_entities, source_entities)})"
+                    ),
+                    "classes": (
+                        f"{source_classes} → {target_classes} "
+                        f"({_numeric_delta(target_classes, source_classes)})"
+                    ),
+                    "methods": (
+                        f"{source_methods} → {target_methods} "
+                        f"({_numeric_delta(target_methods, source_methods)})"
+                    ),
+                })
+                matched_names.add(source_name)
+                matched_names.add(target_name)
+            elif target_name:
+                target = current_map[target_name]
+                rows.append({
+                    "status": "added",
+                    "baseline_name": "-",
+                    "current_name": target_name,
+                    "similarity": "-",
+                    "entities": f"0 → {_component_size(target)}",
+                    "classes": f"0 → {_component_count(target, 'class_count')}",
+                    "methods": f"0 → {_component_count(target, 'method_count')}",
+                })
+                matched_names.add(target_name)
+            elif source_name:
+                source = baseline_map[source_name]
+                rows.append({
+                    "status": "removed",
+                    "baseline_name": source_name,
+                    "current_name": "-",
+                    "similarity": "-",
+                    "entities": f"{_component_size(source)} → 0",
+                    "classes": f"{_component_count(source, 'class_count')} → 0",
+                    "methods": f"{_component_count(source, 'method_count')} → 0",
+                })
+                matched_names.add(source_name)
+
+    for name, component in sorted(current_map.items()):
+        if name not in matched_names:
+            rows.append({
+                "status": "added",
+                "baseline_name": "-",
+                "current_name": name,
+                "similarity": "-",
+                "entities": f"0 → {_component_size(component)}",
+                "classes": f"0 → {_component_count(component, 'class_count')}",
+                "methods": f"0 → {_component_count(component, 'method_count')}",
+            })
+
+    for name, component in sorted(baseline_map.items()):
+        if name not in matched_names:
+            rows.append({
+                "status": "removed",
+                "baseline_name": name,
+                "current_name": "-",
+                "similarity": "-",
+                "entities": f"{_component_size(component)} → 0",
+                "classes": f"{_component_count(component, 'class_count')} → 0",
+                "methods": f"{_component_count(component, 'method_count')} → 0",
+            })
+
+    return rows
+
+
+def _build_dependency_rows(current: dict, baseline: dict | None) -> list[dict]:
+    current_deps = _dependency_set(current)
+    baseline_deps = _dependency_set(baseline)
+    rows = [
+        {"status": "added", "source": source, "target": target}
+        for source, target in sorted(current_deps - baseline_deps)
+    ]
+    rows.extend(
+        {"status": "removed", "source": source, "target": target}
+        for source, target in sorted(baseline_deps - current_deps)
+    )
+    if not rows:
+        rows.append({"status": "matched", "source": "No dependency delta", "target": "-"})
+    return rows
+
+
+def build_report_payload(current: dict, baseline: dict | None, run_url: str = "") -> dict:
+    """Build a unified before/after comparison payload."""
+    a2a_result = _run_a2a_comparison(baseline, current) if baseline else None
+    overview_cards = [
+        {"label": "Current Components", "value": current.get("num_components", 0)},
+        {"label": "Current Classes", "value": current.get("class_count", 0)},
+        {"label": "Current Methods", "value": current.get("method_count", 0)},
+        {
+            "label": "A2A Similarity",
+            "value": f"{a2a_result['overall_similarity']:.4f}" if a2a_result else "n/a",
+        },
+    ]
+    return {
+        "repo_name": "arcade-agent",
+        "baseline_commit": (baseline or {}).get("commit_sha", "none")[:7] or "none",
+        "current_commit": current.get("commit_sha", "local")[:7],
+        "baseline": baseline,
+        "current": current,
+        "a2a_result": a2a_result,
+        "overview_cards": overview_cards,
+        "metric_rows": _build_metric_rows(current, baseline),
+        "component_rows": _build_component_rows(current, baseline, a2a_result),
+        "dependency_rows": _build_dependency_rows(current, baseline),
+        "run_url": run_url,
+    }
+
+
+def _write_step_summary(path: Path, report: dict) -> None:
+    """Append before/after comparison details to the GitHub step summary."""
+    lines = [
+        "\n## 🔄 Architecture Evolution\n",
+        "| Metric | Baseline | Current | Delta |",
+        "|--------|----------|---------|-------|",
+    ]
+    for row in report["metric_rows"][:7]:
+        lines.append(
+            f"| {row['name']} | {row['baseline']} | {row['current']} | {row['delta']} |"
+        )
+
+    lines.append("\n### 🏗️ Component Changes\n")
+    lines.append("| Status | Baseline | Current | Similarity | Entities | Classes | Methods |")
+    lines.append("|--------|----------|---------|------------|----------|---------|---------|")
+    for row in report["component_rows"]:
+        lines.append(
+            f"| {row['status']} | {row['baseline_name']} | {row['current_name']} | "
+            f"{row['similarity']} | {row['entities']} | {row['classes']} | {row['methods']} |"
+        )
+
+    lines.append("\n### 🔗 Dependency Delta\n")
+    lines.append("| Status | Source | Target |")
+    lines.append("|--------|--------|--------|")
+    for row in report["dependency_rows"]:
+        lines.append(f"| {row['status']} | {row['source']} | {row['target']} |")
+
+    if report.get("run_url"):
+        lines.append(
+            f"\n📄 [Open workflow run and download comparison artifacts]({report['run_url']})"
+        )
+
+    with path.open("a") as handle:
+        handle.write("\n".join(lines) + "\n")
+
+
 def _reconstruct_architecture(data: dict) -> Architecture | None:
     """Reconstruct an Architecture object from stored JSON data."""
     components_data = data.get("components", [])
@@ -107,6 +393,7 @@ def build_comment(current: dict, baseline: dict | None, run_url: str = "") -> st
     cur_components = current.get("components", [])
     cur_rci = cur_metrics.get("RCI", 0.0)
     cur_tmq = cur_metrics.get("TurboMQ", 0.0)
+    report = build_report_payload(current, baseline, run_url=run_url)
 
     rci_icon = _rci_icon(cur_rci)
     quality_label = _quality_label(cur_rci)
@@ -151,6 +438,36 @@ def build_comment(current: dict, baseline: dict | None, run_url: str = "") -> st
             f"| {cur_edges_count} "
             f"| {_delta_with_impact('🔗 Edges', cur_edges_count, bl_edges)} |"
         )
+        class_delta = _delta_with_impact(
+            '🧩 Entities',
+            current.get('class_count', 0),
+            baseline.get('class_count', 0),
+        )
+        function_delta = _delta_with_impact(
+            '🧩 Entities',
+            current.get('function_count', 0),
+            baseline.get('function_count', 0),
+        )
+        method_delta = _delta_with_impact(
+            '🧩 Entities',
+            current.get('method_count', 0),
+            baseline.get('method_count', 0),
+        )
+        lines.append(
+            f"| 🏷️ Classes | {baseline.get('class_count', 0)} | "
+            f"{current.get('class_count', 0)} | "
+            f"{class_delta} |"
+        )
+        lines.append(
+            f"| ƒ Functions | {baseline.get('function_count', 0)} | "
+            f"{current.get('function_count', 0)} | "
+            f"{function_delta} |"
+        )
+        lines.append(
+            f"| 🔧 Methods | {baseline.get('method_count', 0)} | "
+            f"{current.get('method_count', 0)} | "
+            f"{method_delta} |"
+        )
         lines.append(
             f"| RCI | {bl_rci:.4f} | {cur_rci:.4f} "
             f"| {_delta_with_impact('RCI', cur_rci, bl_rci)} |"
@@ -176,6 +493,9 @@ def build_comment(current: dict, baseline: dict | None, run_url: str = "") -> st
     lines.append(f"| 📦 Components | **{current.get('num_components')}** |")
     lines.append(f"| 🧩 Entities | **{current.get('num_entities')}** |")
     lines.append(f"| 🔗 Edges | **{current.get('num_edges')}** |")
+    lines.append(f"| 🏷️ Classes | **{current.get('class_count', 0)}** |")
+    lines.append(f"| ƒ Functions | **{current.get('function_count', 0)}** |")
+    lines.append(f"| 🔧 Methods | **{current.get('method_count', 0)}** |")
     lines.append(f"| RCI {rci_icon} | **{cur_rci:.4f}** ({quality_label}) |")
     lines.append(f"| TurboMQ | **{cur_tmq:.4f}** |")
     for name, val in cur_metrics.items():
@@ -269,6 +589,23 @@ def build_comment(current: dict, baseline: dict | None, run_url: str = "") -> st
                     lines.append("")
                 lines.append("</details>\n")
 
+        lines.append("<details><summary>High-level component statistics</summary>\n")
+        lines.append("| Status | Baseline | Current | Similarity | Entities | Classes | Methods |")
+        lines.append("|--------|----------|---------|------------|----------|---------|---------|")
+        for row in report["component_rows"]:
+            lines.append(
+                f"| {row['status']} | {row['baseline_name']} | {row['current_name']} | "
+                f"{row['similarity']} | {row['entities']} | {row['classes']} | {row['methods']} |"
+            )
+        lines.append("</details>\n")
+
+        lines.append("<details><summary>Component dependency delta</summary>\n")
+        lines.append("| Status | Source | Target |")
+        lines.append("|--------|--------|--------|")
+        for row in report["dependency_rows"]:
+            lines.append(f"| {row['status']} | {row['source']} | {row['target']} |")
+        lines.append("</details>\n")
+
         # Smell changes
         cur_smell_types = {s.get("smell_type") for s in cur_smells}
         bl_smell_types = {s.get("smell_type") for s in bl_smells}
@@ -328,7 +665,7 @@ def build_comment(current: dict, baseline: dict | None, run_url: str = "") -> st
         lines.append(f"- **Smells**: 🔴 {smell_count} smells — refactoring recommended")
 
     if run_url:
-        lines.append(f"\n📄 [View full HTML report in CI artifacts]({run_url})")
+        lines.append(f"\n📄 [View HTML reports and artifacts]({run_url})")
 
     lines.append("\n---")
     lines.append(
@@ -353,6 +690,11 @@ def main() -> None:
         default="",
         help="GitHub Actions run URL for artifact linking",
     )
+    parser.add_argument(
+        "--output-html",
+        default="",
+        help="Optional output path for the generated HTML comparison report",
+    )
     args = parser.parse_args()
 
     current_path = Path(args.current)
@@ -371,11 +713,21 @@ def main() -> None:
         else:
             print(f"Baseline file not found: {bl_path} — running without baseline")
 
+    report = build_report_payload(current, baseline, run_url=args.run_url)
     comment = build_comment(current, baseline, run_url=args.run_url)
 
     out = Path(args.output)
     out.write_text(comment)
     print(f"PR comment written to {out}")
+
+    if args.output_html:
+        html_out = Path(args.output_html)
+        export_evolution_html(report, html_out)
+        print(f"HTML comparison report written to {html_out}")
+
+    summary_file = Path(os.environ.get("GITHUB_STEP_SUMMARY", "/dev/null"))
+    if summary_file != Path("/dev/null"):
+        _write_step_summary(summary_file, report)
 
     # Also print inline summary to CI logs
     print("\n" + "=" * 60)
@@ -418,6 +770,16 @@ def main() -> None:
             f"{_delta(current.get('num_edges', 0), baseline.get('num_edges', 0))}"
         )
         print(
+            f"  Classes:     {baseline.get('class_count', 0)} → "
+            f"{current.get('class_count', 0)} "
+            f"{_delta(current.get('class_count', 0), baseline.get('class_count', 0))}"
+        )
+        print(
+            f"  Methods:     {baseline.get('method_count', 0)} → "
+            f"{current.get('method_count', 0)} "
+            f"{_delta(current.get('method_count', 0), baseline.get('method_count', 0))}"
+        )
+        print(
             f"  RCI:         {bl_rci:.4f} → {cur_rci:.4f} {_delta(cur_rci, bl_rci)}"
         )
         print(
@@ -434,6 +796,8 @@ def main() -> None:
         cur_rci = current.get("metrics", {}).get("RCI", 0.0)
         print(f"  Components:  {current.get('num_components')}")
         print(f"  Entities:    {current.get('num_entities')}")
+        print(f"  Classes:     {current.get('class_count', 0)}")
+        print(f"  Methods:     {current.get('method_count', 0)}")
         print(f"  RCI:         {cur_rci:.4f}")
     print("=" * 60 + "\n")
 
