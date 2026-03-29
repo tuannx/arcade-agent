@@ -18,6 +18,7 @@ build_report_payload = _COMPARE_BASELINE_MODULE.build_report_payload
 
 def _snapshot(commit_sha: str, component_name: str, classes: int, methods: int) -> dict:
     return {
+        "repo_name": "sample-repo",
         "commit_sha": commit_sha,
         "algorithm": "pkg",
         "num_components": 1,
@@ -69,3 +70,32 @@ def test_export_evolution_html_writes_report(tmp_path: Path):
     assert "Architecture Evolution Report" in content
     assert "Core" in content
     assert "Methods" in content
+
+
+def test_build_report_payload_derives_names_for_generic_components():
+    baseline = _snapshot("abc1234", "Repository3", 1, 1)
+    baseline["components"][0]["entities"] = [
+        "sample_repo.algorithms.coupling.compute_rci",
+        "sample_repo.algorithms.coupling.compute_turbo_mq",
+    ]
+    baseline["component_dependencies"] = [
+        {"source": "Repository3", "target": "Repository3"}
+    ]
+    current = _snapshot("def5678", "Repository3", 1, 1)
+    current["components"][0]["entities"] = list(baseline["components"][0]["entities"])
+    current["component_dependencies"] = list(baseline["component_dependencies"])
+
+    report = build_report_payload(current, baseline)
+
+    assert report["current"]["components"][0]["comparison_name"] == "AlgorithmsCoupling"
+    assert report["dependency_rows"][0]["status"] == "matched"
+
+
+def test_build_report_payload_uses_repo_name_from_snapshot():
+    baseline = _snapshot("abc1234", "Core", 1, 1)
+    current = _snapshot("def5678", "Core", 1, 1)
+    current["repo_name"] = "independent-framework"
+
+    report = build_report_payload(current, baseline)
+
+    assert report["repo_name"] == "independent-framework"

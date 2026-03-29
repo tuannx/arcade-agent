@@ -77,7 +77,22 @@ def _filter_non_architectural_entities(graph: DependencyGraph) -> DependencyGrap
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Self-analysis of arcade-agent codebase")
+    parser = argparse.ArgumentParser(description="Run architecture self-analysis on a source tree")
+    parser.add_argument(
+        "--source",
+        default=".",
+        help="Path to the source repository or project root",
+    )
+    parser.add_argument(
+        "--language",
+        default="",
+        help="Optional language override (java, python, typescript, c)",
+    )
+    parser.add_argument(
+        "--repo-name",
+        default="",
+        help="Optional project name override for reports",
+    )
     parser.add_argument(
         "--output-json",
         default="arcade_analysis_results.json",
@@ -101,10 +116,11 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    source = str(Path(__file__).parent.parent)
+    source = str(Path(args.source).resolve())
+    language = args.language or None
 
     print(f"[1/5] Ingesting {source}...")
-    repo = ingest(source, language="python")
+    repo = ingest(source, language=language)
     print(f"  Found {len(repo.source_files)} source files")
 
     if not repo.source_files:
@@ -114,7 +130,7 @@ def main() -> None:
     print("[2/5] Parsing dependencies...")
     raw_graph = parse(
         str(repo.path),
-        language=repo.language,
+        language=repo.language or language or "python",
         files=[str(f) for f in repo.source_files],
     )
     graph = _filter_non_architectural_entities(raw_graph)
@@ -132,6 +148,8 @@ def main() -> None:
     source_summary = build_graph_summary(raw_graph)
     results = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
+        "repo_name": args.repo_name or repo.name,
+        "language": repo.language or language,
         "commit_sha": os.environ.get("GITHUB_SHA", "local"),
         "ref": os.environ.get("GITHUB_REF", "local"),
         "algorithm": args.algorithm,
@@ -160,7 +178,7 @@ def main() -> None:
     print(f"  JSON results → {output_json}")
 
     html_out = visualize(
-        repo.name,
+        args.repo_name or repo.name,
         repo.version,
         graph,
         arch,

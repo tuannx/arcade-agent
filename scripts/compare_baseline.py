@@ -21,7 +21,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from arcade_agent.algorithms.architecture import Architecture, Component
-from arcade_agent.exporters.html import export_evolution_html
+from arcade_agent.exporters.html import build_snapshot_mermaid, export_evolution_html
 from arcade_agent.tools.compare import compare
 
 
@@ -110,6 +110,113 @@ def _component_map(data: dict | None) -> dict[str, dict]:
     }
 
 
+def _title_token(token: str) -> str:
+    """Convert a token into a readable component-name fragment."""
+    return token.replace("_", " ").title().replace(" ", "")
+
+
+def _most_common_token(tokens: list[str], excluded: set[str]) -> str | None:
+    counts: dict[str, int] = {}
+    for token in tokens:
+        if not token or token in excluded:
+            continue
+        counts[token] = counts.get(token, 0) + 1
+    if not counts:
+        return None
+    return sorted(counts.items(), key=lambda item: (-item[1], item[0]))[0][0]
+
+
+def _entity_token_parts(entities: list[str]) -> list[list[str]]:
+    """Split entity FQNs into token lists."""
+    parts_list: list[list[str]] = []
+    for fqn in entities:
+        parts = [part for part in fqn.split(".") if part]
+        if len(parts) > 1:
+            parts = parts[:-1]
+        parts_list.append(parts)
+    return parts_list
+
+
+def _common_prefix_parts(parts_list: list[list[str]]) -> list[str]:
+    """Compute the common prefix shared across entity token lists."""
+    if not parts_list:
+        return []
+    prefix: list[str] = []
+    for segments in zip(*parts_list):
+        if len(set(segments)) == 1:
+            prefix.append(segments[0])
+        else:
+            break
+    return prefix
+
+
+def _strip_trailing_digits(name: str) -> str:
+    """Remove a numeric suffix from a component name."""
+    stripped = name.rstrip("0123456789")
+    return stripped or name
+
+
+def _is_generic_component_name(component: dict) -> bool:
+    """Return whether a component name is generic enough to relabel."""
+    name = component["name"]
+    canonical = _strip_trailing_digits(name).replace("_", "").lower()
+    if canonical != name.replace("_", "").lower():
+        return True
+    if canonical in {"default", "cluster", "component", "module"}:
+        return True
+
+    entity_parts = _entity_token_parts(component.get("entities", []))
+    common_prefix = _common_prefix_parts(entity_parts)
+    common_name = "".join(_title_token(part) for part in common_prefix).lower()
+    return bool(common_name and canonical == common_name)
+
+
+def _derive_component_name_from_entities(component: dict) -> str:
+    """Infer a stable component label from entity FQNs."""
+    entities = component.get("entities", [])
+    if not entities:
+        return component["name"]
+
+    parts_list = _entity_token_parts(entities)
+    common_prefix = _common_prefix_parts(parts_list)
+
+    if common_prefix:
+        shared_parts = common_prefix[1:] if len(common_prefix) > 1 else common_prefix
+        if len(shared_parts) >= 2:
+            return "".join(_title_token(part) for part in shared_parts[-2:])
+        if len(shared_parts) == 1:
+            return _title_token(shared_parts[0])
+
+    package_heads: list[str] = []
+    package_tails: list[str] = []
+    module_tokens: list[str] = []
+
+    for parts in parts_list:
+        if parts[:len(common_prefix)] == common_prefix:
+            remainder = parts[len(common_prefix):]
+        else:
+            remainder = parts
+        if not remainder:
+            continue
+        package_heads.append(remainder[0])
+        if len(remainder) > 1:
+            package_tails.append(remainder[1])
+        if len(remainder) > 1:
+            module_tokens.append(remainder[-2])
+
+    head = _most_common_token(package_heads, excluded=set())
+    tail = _most_common_token(package_tails, excluded={head} if head else set())
+    module = _most_common_token(module_tokens, excluded={head, tail} - {None})
+
+    if head and tail:
+        return f"{_title_token(head)}{_title_token(tail)}"
+    if head and module:
+        return f"{_title_token(head)}{_title_token(module)}"
+    if head:
+        return _title_token(head)
+    return component["name"]
+
+
 def _normalize_snapshot(data: dict | None) -> dict | None:
     """Return a copy with stable unique component labels for comparisons."""
     if not data:
@@ -125,11 +232,19 @@ def _normalize_snapshot(data: dict | None) -> dict | None:
     rename_map: dict[str, list[str]] = {}
     for component in components:
         base_name = component["name"]
-        seen_counts[base_name] = seen_counts.get(base_name, 0) + 1
-        if total_counts[base_name] == 1:
-            comparison_name = base_name
+        needs_derived_name = (
+            total_counts[base_name] > 1 or _is_generic_component_name(component)
+        )
+        derived_name = (
+            _derive_component_name_from_entities(component)
+            if needs_derived_name
+            else base_name
+        )
+        seen_counts[derived_name] = seen_counts.get(derived_name, 0) + 1
+        if seen_counts[derived_name] == 1:
+            comparison_name = derived_name
         else:
-            comparison_name = f"{base_name} [{seen_counts[base_name]}]"
+            comparison_name = f"{derived_name}{seen_counts[derived_name]}"
         component["comparison_name"] = comparison_name
         rename_map.setdefault(base_name, []).append(comparison_name)
 
@@ -349,6 +464,7 @@ def build_report_payload(current: dict, baseline: dict | None, run_url: str = ""
     baseline = _normalize_snapshot(baseline)
     current = _normalize_snapshot(current)
     a2a_result = _run_a2a_comparison(baseline, current) if baseline else None
+    repo_name = current.get("repo_name") or (baseline or {}).get("repo_name") or "repository"
     overview_cards = [
         {"label": "Current Components", "value": current.get("num_components", 0)},
         {"label": "Current Classes", "value": current.get("class_count", 0)},
@@ -359,7 +475,7 @@ def build_report_payload(current: dict, baseline: dict | None, run_url: str = ""
         },
     ]
     return {
-        "repo_name": "arcade-agent",
+        "repo_name": repo_name,
         "baseline_commit": (baseline or {}).get("commit_sha", "none")[:7] or "none",
         "current_commit": current.get("commit_sha", "local")[:7],
         "baseline": baseline,
@@ -402,6 +518,11 @@ def _write_step_summary(path: Path, report: dict) -> None:
     else:
         lines.append("| Smells | None detected |")
 
+    lines.append("\n## 🕸️ High-Level Design\n")
+    lines.append("```mermaid")
+    lines.append(build_snapshot_mermaid(current))
+    lines.append("```")
+
     if baseline:
         lines.append("\n## 🔄 Evolution Vs Baseline\n")
         lines.append("| Metric | Baseline | Current | Delta |")
@@ -414,6 +535,16 @@ def _write_step_summary(path: Path, report: dict) -> None:
             f"| Smells | {_smell_count(baseline)} | {_smell_count(current)} | "
             f"{_numeric_delta(_smell_count(current), _smell_count(baseline))} |"
         )
+        lines.append("\n<details><summary>Before/After Diagrams</summary>\n")
+        lines.append("\n**Baseline**")
+        lines.append("```mermaid")
+        lines.append(build_snapshot_mermaid(baseline))
+        lines.append("```")
+        lines.append("\n**Current**")
+        lines.append("```mermaid")
+        lines.append(build_snapshot_mermaid(current))
+        lines.append("```")
+        lines.append("\n</details>")
 
     lines.append("\n## 🏗️ High-Level Components\n")
     lines.append("| Component | Entities | Classes | Methods |")
@@ -606,6 +737,12 @@ def build_comment(current: dict, baseline: dict | None, run_url: str = "") -> st
             lines.append(f"| {name} | {val:.4f} |")
     lines.append("")
 
+    lines.append("### 🕸️ High-Level Design\n")
+    lines.append("```mermaid")
+    lines.append(build_snapshot_mermaid(current))
+    lines.append("```")
+    lines.append("")
+
     # -- Components --------------------------------------------------------------
     if cur_components:
         lines.append("<details><summary>🏗️ Components breakdown</summary>\n")
@@ -708,6 +845,17 @@ def build_comment(current: dict, baseline: dict | None, run_url: str = "") -> st
             )
         lines.append("</details>\n")
 
+        lines.append("<details><summary>Before/After Mermaid diagrams</summary>\n")
+        lines.append("\n**Baseline**")
+        lines.append("```mermaid")
+        lines.append(build_snapshot_mermaid(baseline))
+        lines.append("```")
+        lines.append("\n**Current**")
+        lines.append("```mermaid")
+        lines.append(build_snapshot_mermaid(current))
+        lines.append("```")
+        lines.append("</details>\n")
+
         lines.append("<details><summary>Component dependency delta</summary>\n")
         lines.append("| Status | Source | Target |")
         lines.append("|--------|--------|--------|")
@@ -790,6 +938,11 @@ def main() -> None:
     parser.add_argument("current", help="Path to current analysis JSON")
     parser.add_argument("baseline", nargs="?", help="Path to baseline JSON (optional)")
     parser.add_argument(
+        "--repo-name",
+        default="",
+        help="Optional repository/project name override for reports",
+    )
+    parser.add_argument(
         "--output",
         default="pr_comment.md",
         help="Output file for the generated Markdown comment",
@@ -812,12 +965,16 @@ def main() -> None:
         sys.exit(1)
 
     current = json.loads(current_path.read_text())
+    if args.repo_name:
+        current["repo_name"] = args.repo_name
     baseline: dict | None = None
 
     if args.baseline:
         bl_path = Path(args.baseline)
         if bl_path.exists():
             baseline = json.loads(bl_path.read_text())
+            if args.repo_name:
+                baseline["repo_name"] = args.repo_name
             print(f"Loaded baseline from {bl_path}")
         else:
             print(f"Baseline file not found: {bl_path} — running without baseline")

@@ -591,7 +591,7 @@ def export_comparison_html(
     return output_path
 
 
-def _build_snapshot_mermaid(snapshot: dict | None) -> str:
+def build_snapshot_mermaid(snapshot: dict | None) -> str:
     """Build a Mermaid diagram from stored component snapshots."""
     if not snapshot:
         return "graph TD\n    Empty[\"No baseline snapshot\"]"
@@ -817,8 +817,8 @@ def export_evolution_html(report: dict, output_path: Path) -> Path:
         metric_rows=report["metric_rows"],
         component_rows=report["component_rows"],
         dependency_rows=report["dependency_rows"],
-        baseline_mermaid=_build_snapshot_mermaid(report.get("baseline")),
-        current_mermaid=_build_snapshot_mermaid(report["current"]),
+        baseline_mermaid=build_snapshot_mermaid(report.get("baseline")),
+        current_mermaid=build_snapshot_mermaid(report["current"]),
         run_url=report.get("run_url", ""),
     )
     output_path.write_text(html)
