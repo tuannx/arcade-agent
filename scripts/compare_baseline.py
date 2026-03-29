@@ -11,6 +11,7 @@ Exits with code 0 always (comparison is informational, not a pass/fail gate).
 """
 
 import argparse
+import copy
 import json
 import os
 import sys
@@ -103,7 +104,48 @@ def _component_size(component: dict) -> int:
 def _component_map(data: dict | None) -> dict[str, dict]:
     if not data:
         return {}
-    return {component["name"]: component for component in data.get("components", [])}
+    return {
+        component.get("comparison_name", component["name"]): component
+        for component in data.get("components", [])
+    }
+
+
+def _normalize_snapshot(data: dict | None) -> dict | None:
+    """Return a copy with stable unique component labels for comparisons."""
+    if not data:
+        return None
+
+    normalized = copy.deepcopy(data)
+    components = normalized.get("components", [])
+    total_counts: dict[str, int] = {}
+    for component in components:
+        total_counts[component["name"]] = total_counts.get(component["name"], 0) + 1
+
+    seen_counts: dict[str, int] = {}
+    rename_map: dict[str, list[str]] = {}
+    for component in components:
+        base_name = component["name"]
+        seen_counts[base_name] = seen_counts.get(base_name, 0) + 1
+        if total_counts[base_name] == 1:
+            comparison_name = base_name
+        else:
+            comparison_name = f"{base_name} [{seen_counts[base_name]}]"
+        component["comparison_name"] = comparison_name
+        rename_map.setdefault(base_name, []).append(comparison_name)
+
+    dependencies = normalized.get("component_dependencies", [])
+    dependency_counters: dict[str, int] = {}
+    for dependency in dependencies:
+        for key in ("source", "target"):
+            base_name = dependency[key]
+            labeled_names = rename_map.get(base_name)
+            if not labeled_names:
+                continue
+            dependency_counters[base_name] = dependency_counters.get(base_name, 0) + 1
+            index = min(dependency_counters[base_name] - 1, len(labeled_names) - 1)
+            dependency[key] = labeled_names[index]
+
+    return normalized
 
 
 def _dependency_set(data: dict | None) -> set[tuple[str, str]]:
@@ -167,6 +209,12 @@ def _build_metric_rows(current: dict, baseline: dict | None) -> list[dict]:
         })
 
     return metric_rows
+
+
+def _smell_count(data: dict | None) -> int:
+    if not data:
+        return 0
+    return len(data.get("smells", []))
 
 
 def _build_component_rows(
@@ -298,6 +346,8 @@ def _build_dependency_rows(current: dict, baseline: dict | None) -> list[dict]:
 
 def build_report_payload(current: dict, baseline: dict | None, run_url: str = "") -> dict:
     """Build a unified before/after comparison payload."""
+    baseline = _normalize_snapshot(baseline)
+    current = _normalize_snapshot(current)
     a2a_result = _run_a2a_comparison(baseline, current) if baseline else None
     overview_cards = [
         {"label": "Current Components", "value": current.get("num_components", 0)},
@@ -324,39 +374,90 @@ def build_report_payload(current: dict, baseline: dict | None, run_url: str = ""
 
 
 def _write_step_summary(path: Path, report: dict) -> None:
-    """Append before/after comparison details to the GitHub step summary."""
+    """Write a compact unified GitHub step summary."""
+    current = report["current"]
+    baseline = report.get("baseline")
+    current_metrics = current.get("metrics", {})
+    current_rci = current_metrics.get("RCI", 0.0)
+    current_tmq = current_metrics.get("TurboMQ", 0.0)
+    rci_icon = _rci_icon(current_rci)
+    quality_label = _quality_label(current_rci)
     lines = [
-        "\n## 🔄 Architecture Evolution\n",
-        "| Metric | Baseline | Current | Delta |",
-        "|--------|----------|---------|-------|",
+        "## 🏛️ Architecture Summary\n",
+        "| Metric | Value |",
+        "|--------|-------|",
+        f"| 📦 Components | {current.get('num_components', 0)} |",
+        f"| 🧩 Analysis Entities | {current.get('num_entities', 0)} |",
+        f"| 🏷️ Classes | {current.get('class_count', 0)} |",
+        f"| 🔧 Methods | {current.get('method_count', 0)} |",
+        f"| RCI {rci_icon} | {current_rci:.4f} ({quality_label}) |",
+        f"| TurboMQ | {current_tmq:.4f} |",
     ]
-    for row in report["metric_rows"][:7]:
+
+    if current.get("smells"):
+        smell = current["smells"][0]
         lines.append(
-            f"| {row['name']} | {row['baseline']} | {row['current']} | {row['delta']} |"
+            f"| Top Smell | {smell.get('smell_type', 'Unknown')} ({smell.get('severity', '?')}) |"
+        )
+    else:
+        lines.append("| Smells | None detected |")
+
+    if baseline:
+        lines.append("\n## 🔄 Evolution Vs Baseline\n")
+        lines.append("| Metric | Baseline | Current | Delta |")
+        lines.append("|--------|----------|---------|-------|")
+        for row in report["metric_rows"][:9]:
+            lines.append(
+                f"| {row['name']} | {row['baseline']} | {row['current']} | {row['delta']} |"
+            )
+        lines.append(
+            f"| Smells | {_smell_count(baseline)} | {_smell_count(current)} | "
+            f"{_numeric_delta(_smell_count(current), _smell_count(baseline))} |"
         )
 
-    lines.append("\n### 🏗️ Component Changes\n")
-    lines.append("| Status | Baseline | Current | Similarity | Entities | Classes | Methods |")
-    lines.append("|--------|----------|---------|------------|----------|---------|---------|")
-    for row in report["component_rows"]:
+    lines.append("\n## 🏗️ High-Level Components\n")
+    lines.append("| Component | Entities | Classes | Methods |")
+    lines.append("|-----------|----------|---------|---------|")
+    for component in sorted(
+        current.get("components", []),
+        key=lambda comp: (-_component_size(comp), comp.get("comparison_name", comp["name"])),
+    ):
         lines.append(
-            f"| {row['status']} | {row['baseline_name']} | {row['current_name']} | "
-            f"{row['similarity']} | {row['entities']} | {row['classes']} | {row['methods']} |"
+            f"| {component.get('comparison_name', component['name'])} | "
+            f"{_component_size(component)} | {component.get('class_count', 0)} | "
+            f"{component.get('method_count', 0)} |"
         )
 
-    lines.append("\n### 🔗 Dependency Delta\n")
-    lines.append("| Status | Source | Target |")
-    lines.append("|--------|--------|--------|")
-    for row in report["dependency_rows"]:
-        lines.append(f"| {row['status']} | {row['source']} | {row['target']} |")
+    if baseline:
+        lines.append("\n<details><summary>Component Changes</summary>\n")
+        lines.append(
+            "\n| Status | Baseline | Current | Similarity | Entities | Classes | Methods |"
+        )
+        lines.append("|--------|----------|---------|------------|----------|---------|---------|")
+        for row in report["component_rows"]:
+            lines.append(
+                f"| {row['status']} | {row['baseline_name']} | {row['current_name']} | "
+                f"{row['similarity']} | {row['entities']} | {row['classes']} | {row['methods']} |"
+            )
+        lines.append("\n</details>")
+
+        dependency_delta = [
+            row for row in report["dependency_rows"] if row["status"] != "matched"
+        ]
+        if dependency_delta:
+            lines.append("\n<details><summary>Dependency Delta</summary>\n")
+            lines.append("\n| Status | Source | Target |")
+            lines.append("|--------|--------|--------|")
+            for row in dependency_delta:
+                lines.append(f"| {row['status']} | {row['source']} | {row['target']} |")
+            lines.append("\n</details>")
 
     if report.get("run_url"):
         lines.append(
             f"\n📄 [Open workflow run and download comparison artifacts]({report['run_url']})"
         )
 
-    with path.open("a") as handle:
-        handle.write("\n".join(lines) + "\n")
+    path.write_text("\n".join(lines) + "\n")
 
 
 def _reconstruct_architecture(data: dict) -> Architecture | None:
@@ -366,7 +467,7 @@ def _reconstruct_architecture(data: dict) -> Architecture | None:
         return None
     components = [
         Component(
-            name=c["name"],
+            name=c.get("comparison_name", c["name"]),
             responsibility=c.get("responsibility", ""),
             entities=c.get("entities", []),
         )
@@ -388,12 +489,14 @@ def build_comment(current: dict, baseline: dict | None, run_url: str = "") -> st
     """Build a Markdown PR comment body."""
     lines: list[str] = []
 
+    report = build_report_payload(current, baseline, run_url=run_url)
+    current = report["current"]
+    baseline = report.get("baseline")
     cur_metrics = current.get("metrics", {})
     cur_smells = current.get("smells", [])
     cur_components = current.get("components", [])
     cur_rci = cur_metrics.get("RCI", 0.0)
     cur_tmq = cur_metrics.get("TurboMQ", 0.0)
-    report = build_report_payload(current, baseline, run_url=run_url)
 
     rci_icon = _rci_icon(cur_rci)
     quality_label = _quality_label(cur_rci)
@@ -506,14 +609,20 @@ def build_comment(current: dict, baseline: dict | None, run_url: str = "") -> st
     # -- Components --------------------------------------------------------------
     if cur_components:
         lines.append("<details><summary>🏗️ Components breakdown</summary>\n")
-        lines.append("| Component | Entities |")
-        lines.append("|-----------|----------|")
+        lines.append("| Component | Entities | Classes | Methods |")
+        lines.append("|-----------|----------|---------|---------|")
         for comp in sorted(
             cur_components,
-            key=lambda c: -(c.get("num_entities") or len(c.get("entities", []))),
+            key=lambda c: (
+                -(c.get("num_entities") or len(c.get("entities", []))),
+                c.get("comparison_name", c["name"]),
+            ),
         ):
             count = comp.get("num_entities") or len(comp.get("entities", []))
-            lines.append(f"| {comp['name']} | {count} |")
+            lines.append(
+                f"| {comp.get('comparison_name', comp['name'])} | {count} | "
+                f"{comp.get('class_count', 0)} | {comp.get('method_count', 0)} |"
+            )
         lines.append("</details>\n")
 
     # -- Smells ------------------------------------------------------------------

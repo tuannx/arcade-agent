@@ -78,9 +78,16 @@ def wca(
 
     # Build architecture from clusters
     components = []
+    seen_names: set[str] = set()
     for key, members in sorted(clusters.items()):
         # Name from common package prefix
         name = _cluster_name(members, dep_graph)
+        base_name = name
+        counter = 1
+        while name in seen_names:
+            counter += 1
+            name = f"{base_name}{counter}"
+        seen_names.add(name)
         components.append(
             Component(
                 name=name,

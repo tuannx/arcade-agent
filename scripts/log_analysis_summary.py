@@ -6,7 +6,6 @@ Usage:
 """
 
 import json
-import os
 import sys
 from pathlib import Path
 
@@ -108,69 +107,6 @@ def main() -> None:
         print(f"│{'  ✅ No architectural smells detected':<{width}}│")
 
     print(f"└{border}┘")
-
-    # GitHub Actions step summary (if available)
-    summary_file = Path(os.environ.get("GITHUB_STEP_SUMMARY", "/dev/null"))
-    if summary_file != Path("/dev/null"):
-        try:
-            _write_step_summary(summary_file, r, rci, turbo_mq, smells, components, metrics)
-        except Exception as exc:
-            print(f"[warn] Could not write step summary: {exc}")
-
-
-def _write_step_summary(
-    path: Path,
-    r: dict,
-    rci: float,
-    turbo_mq: float,
-    smells: list,
-    components: list,
-    metrics: dict,
-) -> None:
-    icon = _rci_icon(rci)
-    label = _quality_label(rci)
-    lines = [
-        "## 🏛️ Architecture Analysis Results\n",
-        "| Metric | Value |",
-        "|--------|-------|",
-        f"| 📦 Components | {r.get('num_components')} |",
-        f"| 🧩 Entities | {r.get('num_entities')} |",
-        f"| 🔗 Edges | {r.get('num_edges')} |",
-        f"| 🏷️ Classes | {r.get('class_count', 0)} |",
-        f"| ƒ Functions | {r.get('function_count', 0)} |",
-        f"| 🔧 Methods | {r.get('method_count', 0)} |",
-        f"| RCI {icon} | {rci:.4f} ({label}) |",
-        f"| TurboMQ | {turbo_mq:.4f} |",
-    ]
-    for name, val in metrics.items():
-        if name not in ("RCI", "TurboMQ"):
-            lines.append(f"| {name} | {val:.4f} |")
-
-    lines.append("\n### 🏗️ Components\n")
-    lines.append("| Component | Entities | Classes | Methods |")
-    lines.append("|-----------|----------|---------|---------|")
-    for comp in sorted(components, key=lambda c: (-_component_count(c), c["name"])):
-        count = _component_count(comp)
-        lines.append(
-            f"| {comp['name']} | {count} | {comp.get('class_count', 0)} | "
-            f"{comp.get('method_count', 0)} |"
-        )
-
-    lines.append("\n### 🚨 Architectural Smells\n")
-    if smells:
-        lines.append("| Severity | Type | Affected |")
-        lines.append("|----------|------|----------|")
-        for s in smells:
-            si = _severity_icon(s.get("severity", ""))
-            stype = s.get("smell_type", "Unknown")
-            comps = ", ".join(s.get("affected_components", []))
-            lines.append(f"| {si} {s.get('severity','?')} | {stype} | {comps} |")
-    else:
-        lines.append("✅ No architectural smells detected.")
-
-    with path.open("a") as f:
-        f.write("\n".join(lines) + "\n")
-
 
 if __name__ == "__main__":
     main()
