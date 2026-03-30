@@ -42,4 +42,6 @@ jobs:
       source-path: .
       primary-algorithm: pkg
       baseline-workflow-id: ci.yml
+      tooling-repository: ${{ github.repository }}
+      tooling-ref: ${{ github.sha }}
     secrets: inherit

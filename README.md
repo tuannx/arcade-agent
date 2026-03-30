@@ -98,6 +98,11 @@ This replaces heuristic smell detection (entity count thresholds, suffix matchin
 
 This repository exposes a reusable GitHub Actions workflow at `.github/workflows/architecture-analysis-reusable.yml` so other repositories can integrate architecture evaluation with one job.
 
+Current implementation uses **PA1 (dual checkout)**:
+
+- Checkout target repository source code for analysis.
+- Checkout the tooling repository (this repo by default) to access `scripts/run_self_analysis.py`, `scripts/compare_baseline.py`, and related helpers.
+
 Minimal caller workflow:
 
 ```yaml
@@ -115,6 +120,8 @@ jobs:
       source-path: .
       primary-algorithm: pkg
       baseline-workflow-id: ci.yml
+      tooling-repository: lemduc/arcade-agent
+      tooling-ref: <release-tag-or-commit-sha>
     secrets: inherit
 ```
 
