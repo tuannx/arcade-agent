@@ -111,7 +111,7 @@ on:
 jobs:
 	architecture:
 		# For tuannx fork validation:
-		uses: tuannx/arcade-agent/.github/workflows/architecture-analysis-reusable.yml@<pinned-sha-or-tag>
+		uses: tuannx/arcade-agent/.github/workflows/architecture-analysis-reusable.yml@1c49fa08f3692371bd3febbc4631a24e119c3c3c
 		# For upstream after release, use:
 		# uses: lemduc/arcade-agent/.github/workflows/architecture-analysis-reusable.yml@<release-tag>
 		with:
