@@ -2,7 +2,7 @@
 
 import pytest
 
-from arcade_agent.algorithms.architecture import Architecture, Component
+from arcade_agent.models.architecture import Architecture, Component
 from arcade_agent.serialization import load_architecture, save_architecture
 
 
