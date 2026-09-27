@@ -1,0 +1,96 @@
+{
+  "django": {
+    "num_entities": 10881,
+    "num_edges": 8901,
+    "num_components": 21,
+    "algorithm": "pkg",
+    "largest_components": [
+      3451,
+      2832,
+      1422,
+      1316,
+      511,
+      427,
+      199,
+      196,
+      94,
+      90
+    ],
+    "num_smells": 18,
+    "smells_by_type": {
+      "Dependency Cycle": 1,
+      "Concern Overload": 10,
+      "Scattered Parasitic Functionality": 3,
+      "Link/Upstream Overload": 4
+    },
+    "metrics": {
+      "RCI": 0.6605,
+      "TurboMQ": 9.9205,
+      "BasicMQ": 0.4724,
+      "IntraConnectivity": 0.0045,
+      "InterConnectivity": 0.0003,
+      "TwoWayPairRatio": 0.3333
+    },
+    "analysis_seconds": 6.3,
+    "homepage": "https://www.djangoproject.com/"
+  },
+  "react": {
+    "num_entities": 7861,
+    "num_edges": 4221,
+    "num_components": 7,
+    "algorithm": "pkg",
+    "largest_components": [
+      5070,
+      1666,
+      697,
+      402,
+      20,
+      3,
+      3
+    ],
+    "num_smells": 7,
+    "smells_by_type": {
+      "Dependency Cycle": 1,
+      "Concern Overload": 2,
+      "Scattered Parasitic Functionality": 4
+    },
+    "metrics": {
+      "RCI": 0.9647,
+      "TurboMQ": 2.5428,
+      "BasicMQ": 0.3633,
+      "IntraConnectivity": 0.0001,
+      "InterConnectivity": 0.0,
+      "TwoWayPairRatio": 0.6667
+    },
+    "analysis_seconds": 8.4,
+    "homepage": "https://react.dev/"
+  },
+  "vue": {
+    "num_entities": 1630,
+    "num_edges": 1730,
+    "num_components": 6,
+    "algorithm": "pkg",
+    "largest_components": [
+      1526,
+      48,
+      48,
+      6,
+      1,
+      1
+    ],
+    "num_smells": 2,
+    "smells_by_type": {
+      "Concern Overload": 2
+    },
+    "metrics": {
+      "RCI": 1.0,
+      "TurboMQ": 1.0,
+      "BasicMQ": 0.1667,
+      "IntraConnectivity": 0.0001,
+      "InterConnectivity": 0.0,
+      "TwoWayPairRatio": 0.0
+    },
+    "analysis_seconds": 1.4,
+    "homepage": "https://vuejs.org/"
+  }
+}

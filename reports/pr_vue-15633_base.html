@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>arcade-agent: vue PR#15633 base (a429b2a6)</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6; color: #1a1a2e; background: #f8f9fa;
+            max-width: 1200px; margin: 0 auto; padding: 2rem; padding-top: 4rem;
+        }
+        nav {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+            background: #1e293b; padding: 0.6rem 2rem;
+            display: flex; align-items: center; gap: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        nav .nav-title {
+            font-weight: 700; color: #f8fafc; font-size: 0.85rem;
+            white-space: nowrap; margin-right: 0.5rem;
+        }
+        nav a {
+            color: #94a3b8; text-decoration: none; font-size: 0.8rem;
+            padding: 0.3rem 0.7rem; border-radius: 4px; transition: all 0.15s;
+            white-space: nowrap;
+        }
+        nav a:hover { color: #f8fafc; background: #334155; }
+        h1 { font-size: 1.8rem; margin-bottom: 0.25rem; }
+        h2 { font-size: 1.3rem; margin: 2rem 0 1rem; border-bottom: 2px solid #e0e0e0; padding-bottom: 0.5rem; scroll-margin-top: 3.5rem; }
+        h3 { font-size: 1.1rem; margin: 1rem 0 0.5rem; }
+        .subtitle { color: #666; margin-bottom: 2rem; }
+        .stats {
+            display: flex; gap: 1.5rem; margin-bottom: 2rem; flex-wrap: wrap;
+        }
+        .stat-card {
+            background: white; border-radius: 8px; padding: 1rem 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1); min-width: 140px;
+        }
+        .stat-card .number { font-size: 1.8rem; font-weight: 700; color: #2563eb; }
+        .stat-card .label { font-size: 0.85rem; color: #666; }
+        .card {
+            background: white; border-radius: 8px; padding: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 1rem;
+        }
+        .mermaid { text-align: center; margin: 1rem 0; }
+        table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+        th, td { text-align: left; padding: 0.75rem; border-bottom: 1px solid #e0e0e0; }
+        th { background: #f1f5f9; font-weight: 600; font-size: 0.85rem; text-transform: uppercase; }
+        td { font-size: 0.9rem; }
+        .entity-list { font-family: monospace; font-size: 0.8rem; color: #555; max-width: 500px; }
+        .smell {
+            border-left: 4px solid #ccc; padding: 1rem 1.5rem; margin-bottom: 1rem;
+            background: white; border-radius: 0 8px 8px 0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .smell.high { border-left-color: #ef4444; }
+        .smell.medium { border-left-color: #f59e0b; }
+        .smell.low { border-left-color: #3b82f6; }
+        .smell-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; }
+        .badge {
+            font-size: 0.7rem; font-weight: 600; padding: 0.2rem 0.6rem;
+            border-radius: 99px; text-transform: uppercase;
+        }
+        .badge.high { background: #fef2f2; color: #dc2626; }
+        .badge.medium { background: #fffbeb; color: #d97706; }
+        .badge.low { background: #eff6ff; color: #2563eb; }
+        .smell-detail { margin: 0.5rem 0; font-size: 0.9rem; }
+        .smell-detail strong { display: inline-block; width: 100px; color: #555; }
+        .rationale { background: #f8fafc; padding: 1rem; border-radius: 6px; font-style: italic; color: #555; }
+        .metric-card {
+            display: inline-block; background: white; border-radius: 8px; padding: 1rem 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin: 0.5rem; min-width: 160px;
+        }
+        .metric-card .value { font-size: 1.4rem; font-weight: 700; color: #059669; }
+        .metric-card .name { font-size: 0.8rem; color: #666; }
+        .concern-tag {
+            display: inline-block; background: #e0e7ff; color: #3730a3;
+            font-size: 0.75rem; padding: 0.2rem 0.6rem; border-radius: 99px;
+            margin: 0.15rem; font-weight: 500;
+        }
+        footer { margin-top: 3rem; text-align: center; color: #999; font-size: 0.8rem; }
+    </style>
+</head>
+<body>
+    <nav>
+        <span class="nav-title">arcade-agent</span>
+        <a href="#overview">Overview</a>
+        
+        <a href="#diagram">Diagram</a>
+        <a href="#components">Components</a>
+        <a href="#smells">Smells (2)</a>
+        <a href="#dependencies">Dependencies</a>
+    </nav>
+
+    <h1 id="overview">Architecture Report</h1>
+    <p class="subtitle">vue PR#15633 base &mdash; version a429b2a6 &mdash; recovered with pkg</p>
+
+    <div class="stats">
+        <div class="stat-card">
+            <div class="number">2779</div>
+            <div class="label">Entities</div>
+        </div>
+        <div class="stat-card">
+            <div class="number">3504</div>
+            <div class="label">Dependencies</div>
+        </div>
+        <div class="stat-card">
+            <div class="number">5</div>
+            <div class="label">Components</div>
+        </div>
+        <div class="stat-card">
+            <div class="number">2</div>
+            <div class="label">Smells</div>
+        </div>
+    </div>
+
+    
+
+    <h2 id="diagram">Architecture Diagram</h2>
+    <div class="card">
+        <pre class="mermaid">
+graph TD
+    Packages["Packages\n(2635 entities)"]
+    Packages_Private["Packages-Private\n(85 entities)"]
+    Rolldown["Rolldown\n(3 entities)"]
+    Scripts["Scripts\n(55 entities)"]
+    Vite["Vite\n(1 entities)"]
+        </pre>
+    </div>
+
+    
+    <div class="rationale">Package-based grouping (depth=1 after common prefix '') with dependency-affinity facade refinement (2 entities reassigned).</div>
+    
+
+    <h2 id="components">Components</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Component</th>
+                <th>Responsibility</th>
+                <th>#</th>
+                
+                <th>Entities</th>
+            </tr>
+        </thead>
+        <tbody>
+        
+            <tr>
+                <td><strong>Packages</strong></td>
+                <td>Entities in packages</td>
+                <td>2635</td>
+                
+                <td class="entity-list">packages.compiler-core, packages.compiler-core.src, packages.compiler-core.src.ast.ArrayExpression, packages.compiler-core.src.ast.AssignmentExpression, packages.compiler-core.src.ast.AttributeNode, packages.compiler-core.src.ast.BaseElementNode, packages.compiler-core.src.ast.BlockStatement, packages.compiler-core.src.ast.CacheExpression, ... (+2627 more)</td>
+            </tr>
+        
+            <tr>
+                <td><strong>Packages-Private</strong></td>
+                <td>Entities in packages-private</td>
+                <td>85</td>
+                
+                <td class="entity-list">packages-private.benchmark.benchmark, packages-private.benchmark.buildApp, packages-private.benchmark.buildLib, packages-private.benchmark.client, packages-private.benchmark.client.data._random, packages-private.benchmark.client.data.buildData, packages-private.benchmark.client.profiling.compute, packages-private.benchmark.client.profiling.defer, ... (+77 more)</td>
+            </tr>
+        
+            <tr>
+                <td><strong>Rolldown</strong></td>
+                <td>Entities in rolldown</td>
+                <td>3</td>
+                
+                <td class="entity-list">rolldown.dts.config.copyMts, rolldown.dts.config.patchTypes, rolldown.dts.config.resolveExternal</td>
+            </tr>
+        
+            <tr>
+                <td><strong>Scripts</strong></td>
+                <td>Entities in scripts</td>
+                <td>55</td>
+                
+                <td class="entity-list">packages-private.dts-test.defineCustomElement.test-d, packages-private.dts-test.vapor.defineVaporCustomElement.test-d, scripts.aliases.resolveEntryForPkg, scripts.build-types.write, scripts.build.buildAll, scripts.build.checkAllSizes, scripts.build.checkFileSize, scripts.build.checkSize, ... (+47 more)</td>
+            </tr>
+        
+            <tr>
+                <td><strong>Vite</strong></td>
+                <td>Entities in vite</td>
+                <td>1</td>
+                
+                <td class="entity-list">vite.config</td>
+            </tr>
+        
+        </tbody>
+    </table>
+
+    <h2 id="smells">Architectural Smells (2)</h2>
+    
+    
+    <div class="smell high">
+        <div class="smell-header">
+            <span class="badge high">high</span>
+            <strong>SmellType.CONCERN_OVERLOAD</strong>
+        </div>
+        <p class="smell-detail">Packages-Private contains 85 entities but only 1 internal dependencies (0.01 per entity), suggesting multiple responsibilities.</p>
+        <p class="smell-detail"><strong>Why:</strong> Large components are harder to understand, test, and maintain. When their internals are also sparsely connected, that usually means the component is acting as a bucket for unrelated concerns rather than a cohesive module.</p>
+        <p class="smell-detail"><strong>Fix:</strong> Consider splitting Packages-Private into smaller, focused components with single responsibilities.</p>
+        <p class="smell-detail"><strong>Affects:</strong> Packages-Private</p>
+    </div>
+    
+    <div class="smell high">
+        <div class="smell-header">
+            <span class="badge high">high</span>
+            <strong>SmellType.CONCERN_OVERLOAD</strong>
+        </div>
+        <p class="smell-detail">Scripts contains 55 entities but only 2 internal dependencies (0.04 per entity), suggesting multiple responsibilities.</p>
+        <p class="smell-detail"><strong>Why:</strong> Large components are harder to understand, test, and maintain. When their internals are also sparsely connected, that usually means the component is acting as a bucket for unrelated concerns rather than a cohesive module.</p>
+        <p class="smell-detail"><strong>Fix:</strong> Consider splitting Scripts into smaller, focused components with single responsibilities.</p>
+        <p class="smell-detail"><strong>Affects:</strong> Scripts</p>
+    </div>
+    
+    
+
+    <h2 id="dependencies">Dependency Summary</h2>
+    <div class="card">
+        <table>
+            <thead><tr><th>Package</th><th>Entities</th></tr></thead>
+            <tbody>
+            
+                <tr>
+                    <td><code>packages.runtime-vapor.src</code></td>
+                    <td>380</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.runtime-core.src</code></td>
+                    <td>326</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.compiler-core.src</code></td>
+                    <td>278</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.reactivity.src</code></td>
+                    <td>173</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.compiler-vapor.src.generators</code></td>
+                    <td>148</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.runtime-vapor.src.dom</code></td>
+                    <td>125</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.compiler-vapor.src.transforms</code></td>
+                    <td>114</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.compiler-sfc.src.script</code></td>
+                    <td>112</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.compiler-vapor.src</code></td>
+                    <td>103</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.runtime-dom.src</code></td>
+                    <td>98</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.runtime-vapor.src.components</code></td>
+                    <td>79</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.shared.src</code></td>
+                    <td>76</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.runtime-core.src.compat</code></td>
+                    <td>65</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.runtime-core.src.components</code></td>
+                    <td>62</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.compiler-core.src.transforms</code></td>
+                    <td>53</td>
+                </tr>
+            
+                <tr>
+                    <td><code>scripts</code></td>
+                    <td>53</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.compiler-sfc.src</code></td>
+                    <td>51</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.compiler-ssr.src.transforms</code></td>
+                    <td>36</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.compiler-sfc.src.style</code></td>
+                    <td>35</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.compiler-sfc.src.template</code></td>
+                    <td>28</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.server-renderer.src</code></td>
+                    <td>27</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.runtime-dom.src.components</code></td>
+                    <td>26</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.runtime-test.src</code></td>
+                    <td>26</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.compiler-dom.src.transforms</code></td>
+                    <td>22</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.runtime-core.src.helpers</code></td>
+                    <td>22</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.runtime-dom.src.directives</code></td>
+                    <td>22</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.server-renderer.src.helpers</code></td>
+                    <td>19</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.runtime-dom.src.modules</code></td>
+                    <td>16</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.runtime-vapor.src.directives</code></td>
+                    <td>15</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages</code></td>
+                    <td>12</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private</code></td>
+                    <td>12</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.compiler-ssr.src</code></td>
+                    <td>11</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.vue</code></td>
+                    <td>11</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.compiler-core.src.compat</code></td>
+                    <td>10</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.compiler-vapor.src.ir</code></td>
+                    <td>10</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.benchmark.client</code></td>
+                    <td>8</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.compiler-dom.src</code></td>
+                    <td>7</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.runtime-dom</code></td>
+                    <td>6</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.runtime-vapor.src.helpers</code></td>
+                    <td>6</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.vue-compat.src</code></td>
+                    <td>6</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.dts-test.ref</code></td>
+                    <td>5</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.dts-test.functionalComponent</code></td>
+                    <td>5</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.runtime-dom.src.helpers</code></td>
+                    <td>4</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.vue.src</code></td>
+                    <td>4</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.sfc-playground.src</code></td>
+                    <td>4</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.dts-test.vapor.functionalComponent</code></td>
+                    <td>4</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.dts-test.appUse</code></td>
+                    <td>3</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.local-playground.setup</code></td>
+                    <td>3</td>
+                </tr>
+            
+                <tr>
+                    <td><code>rolldown.dts</code></td>
+                    <td>3</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.compiler-dom</code></td>
+                    <td>2</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.runtime-core.types</code></td>
+                    <td>2</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.template-explorer</code></td>
+                    <td>2</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.template-explorer.src</code></td>
+                    <td>2</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.dts-test.defineComponent</code></td>
+                    <td>2</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.vue.compiler-sfc.index</code></td>
+                    <td>2</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.compiler-core</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.compiler-sfc</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.compiler-ssr</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.compiler-vapor</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.reactivity.__benchmarks__.computed</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.reactivity.__benchmarks__.effect</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.reactivity.__benchmarks__.reactiveArray</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.reactivity.__benchmarks__.reactiveMap</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.reactivity.__benchmarks__.reactiveObject</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.reactivity.__benchmarks__.ref</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.reactivity</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.runtime-core</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.runtime-test</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.runtime-vapor</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.server-renderer</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.shared</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.vue-compat</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.benchmark</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.dts-built-test</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.dts-test.appDirective</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.dts-test.built</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.dts-test.compiler</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.dts-test.component</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.dts-test.defineCustomElement</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.dts-test.directives</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.dts-test.extractProps</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.dts-test.h</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.dts-test.inject</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.dts-test.reactivity</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.dts-test.scheduler</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.dts-test.setupHelpers</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.dts-test</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.dts-test.vapor.defineVaporCustomElement</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.dts-test.vapor.directives</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.dts-test.vapor</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.dts-test.watch</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.local-playground.src</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.local-playground.vite</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.local-playground.vite.prod</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.sfc-playground.src.download</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.sfc-playground.vite</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.vapor-e2e-test.interop</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.vapor-e2e-test.todomvc</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.vapor-e2e-test.transition</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.vapor-e2e-test.transition-group</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.vapor-e2e-test.vite</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.vite-debug</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.vite-debug.vite</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>vite</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.dts-test.componentInstance</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.dts-test.componentTypeExtensions</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.dts-test.tsx</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.dts-test.vapor.defineVaporComponent</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages.vue.compiler-sfc</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.sfc-playground.src.download.template</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>packages-private.sfc-playground.src.download.template.vite</code></td>
+                    <td>1</td>
+                </tr>
+            
+            </tbody>
+        </table>
+    </div>
+
+    <footer>
+        Generated by arcade-agent &mdash; software architecture analysis toolkit
+    </footer>
+
+    <script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+</body>
+</html>

@@ -1,0 +1,1577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>arcade-agent: django PR#18036 base (d876be79)</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6; color: #1a1a2e; background: #f8f9fa;
+            max-width: 1200px; margin: 0 auto; padding: 2rem; padding-top: 4rem;
+        }
+        nav {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+            background: #1e293b; padding: 0.6rem 2rem;
+            display: flex; align-items: center; gap: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        nav .nav-title {
+            font-weight: 700; color: #f8fafc; font-size: 0.85rem;
+            white-space: nowrap; margin-right: 0.5rem;
+        }
+        nav a {
+            color: #94a3b8; text-decoration: none; font-size: 0.8rem;
+            padding: 0.3rem 0.7rem; border-radius: 4px; transition: all 0.15s;
+            white-space: nowrap;
+        }
+        nav a:hover { color: #f8fafc; background: #334155; }
+        h1 { font-size: 1.8rem; margin-bottom: 0.25rem; }
+        h2 { font-size: 1.3rem; margin: 2rem 0 1rem; border-bottom: 2px solid #e0e0e0; padding-bottom: 0.5rem; scroll-margin-top: 3.5rem; }
+        h3 { font-size: 1.1rem; margin: 1rem 0 0.5rem; }
+        .subtitle { color: #666; margin-bottom: 2rem; }
+        .stats {
+            display: flex; gap: 1.5rem; margin-bottom: 2rem; flex-wrap: wrap;
+        }
+        .stat-card {
+            background: white; border-radius: 8px; padding: 1rem 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1); min-width: 140px;
+        }
+        .stat-card .number { font-size: 1.8rem; font-weight: 700; color: #2563eb; }
+        .stat-card .label { font-size: 0.85rem; color: #666; }
+        .card {
+            background: white; border-radius: 8px; padding: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 1rem;
+        }
+        .mermaid { text-align: center; margin: 1rem 0; }
+        table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+        th, td { text-align: left; padding: 0.75rem; border-bottom: 1px solid #e0e0e0; }
+        th { background: #f1f5f9; font-weight: 600; font-size: 0.85rem; text-transform: uppercase; }
+        td { font-size: 0.9rem; }
+        .entity-list { font-family: monospace; font-size: 0.8rem; color: #555; max-width: 500px; }
+        .smell {
+            border-left: 4px solid #ccc; padding: 1rem 1.5rem; margin-bottom: 1rem;
+            background: white; border-radius: 0 8px 8px 0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .smell.high { border-left-color: #ef4444; }
+        .smell.medium { border-left-color: #f59e0b; }
+        .smell.low { border-left-color: #3b82f6; }
+        .smell-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; }
+        .badge {
+            font-size: 0.7rem; font-weight: 600; padding: 0.2rem 0.6rem;
+            border-radius: 99px; text-transform: uppercase;
+        }
+        .badge.high { background: #fef2f2; color: #dc2626; }
+        .badge.medium { background: #fffbeb; color: #d97706; }
+        .badge.low { background: #eff6ff; color: #2563eb; }
+        .smell-detail { margin: 0.5rem 0; font-size: 0.9rem; }
+        .smell-detail strong { display: inline-block; width: 100px; color: #555; }
+        .rationale { background: #f8fafc; padding: 1rem; border-radius: 6px; font-style: italic; color: #555; }
+        .metric-card {
+            display: inline-block; background: white; border-radius: 8px; padding: 1rem 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin: 0.5rem; min-width: 160px;
+        }
+        .metric-card .value { font-size: 1.4rem; font-weight: 700; color: #059669; }
+        .metric-card .name { font-size: 0.8rem; color: #666; }
+        .concern-tag {
+            display: inline-block; background: #e0e7ff; color: #3730a3;
+            font-size: 0.75rem; padding: 0.2rem 0.6rem; border-radius: 99px;
+            margin: 0.15rem; font-weight: 500;
+        }
+        footer { margin-top: 3rem; text-align: center; color: #999; font-size: 0.8rem; }
+    </style>
+</head>
+<body>
+    <nav>
+        <span class="nav-title">arcade-agent</span>
+        <a href="#overview">Overview</a>
+        
+        <a href="#diagram">Diagram</a>
+        <a href="#components">Components</a>
+        <a href="#smells">Smells (17)</a>
+        <a href="#dependencies">Dependencies</a>
+    </nav>
+
+    <h1 id="overview">Architecture Report</h1>
+    <p class="subtitle">django PR#18036 base &mdash; version d876be79 &mdash; recovered with pkg</p>
+
+    <div class="stats">
+        <div class="stat-card">
+            <div class="number">10242</div>
+            <div class="label">Entities</div>
+        </div>
+        <div class="stat-card">
+            <div class="number">8141</div>
+            <div class="label">Dependencies</div>
+        </div>
+        <div class="stat-card">
+            <div class="number">19</div>
+            <div class="label">Components</div>
+        </div>
+        <div class="stat-card">
+            <div class="number">17</div>
+            <div class="label">Smells</div>
+        </div>
+    </div>
+
+    
+
+    <h2 id="diagram">Architecture Diagram</h2>
+    <div class="card">
+        <pre class="mermaid">
+graph TD
+    Default["Default\n(1 entities)"]
+    Django["Django\n(27 entities)"]
+    Apps["Apps\n(32 entities)"]
+    Conf["Conf\n(93 entities)"]
+    Contrib["Contrib\n(2743 entities)"]
+    Core["Core\n(1162 entities)"]
+    Db["Db\n(3267 entities)"]
+    Dispatch["Dispatch\n(18 entities)"]
+    Forms["Forms\n(489 entities)"]
+    Http["Http\n(198 entities)"]
+    Middleware["Middleware\n(44 entities)"]
+    Template["Template\n(410 entities)"]
+    Templatetags["Templatetags\n(43 entities)"]
+    Urls["Urls\n(80 entities)"]
+    Utils["Utils\n(1399 entities)"]
+    Views["Views\n(189 entities)"]
+    Docs["Docs\n(1 entities)"]
+    Ext["Ext\n(40 entities)"]
+    Scripts["Scripts\n(6 entities)"]
+    Apps --> Core
+    Apps --> Utils
+    Conf --> Core
+    Conf --> Urls
+    Conf --> Utils
+    Conf --> Views
+    Contrib --> Apps
+    Contrib --> Conf
+    Contrib --> Core
+    Contrib --> Db
+    Contrib --> Dispatch
+    Contrib --> Django
+    Contrib --> Forms
+    Contrib --> Http
+    Contrib --> Middleware
+    Contrib --> Template
+    Contrib --> Templatetags
+    Contrib --> Urls
+    Contrib --> Utils
+    Contrib --> Views
+    Core --> Contrib
+    Core --> Db
+    Core --> Dispatch
+    Core --> Ext
+    Core --> Forms
+    Core --> Http
+    Core --> Template
+    Core --> Urls
+    Core --> Utils
+    Db --> Apps
+    Db --> Contrib
+    Db --> Core
+    Db --> Dispatch
+    Db --> Django
+    Db --> Forms
+    Db --> Utils
+    Dispatch --> Db
+    Dispatch --> Utils
+    Django --> Contrib
+    Django --> Core
+    Django --> Http
+    Django --> Urls
+    Django --> Utils
+    Docs --> Template
+    Forms --> Conf
+    Forms --> Contrib
+    Forms --> Core
+    Forms --> Db
+    Forms --> Template
+    Forms --> Templatetags
+    Forms --> Utils
+    Http --> Contrib
+    Http --> Core
+    Http --> Db
+    Http --> Utils
+    Middleware --> Conf
+    Middleware --> Core
+    Middleware --> Http
+    Middleware --> Urls
+    Middleware --> Utils
+    Scripts --> Core
+    Scripts --> Utils
+    Template --> Conf
+    Template --> Contrib
+    Template --> Core
+    Template --> Db
+    Template --> Http
+    Template --> Middleware
+    Template --> Utils
+    Templatetags --> Contrib
+    Templatetags --> Core
+    Templatetags --> Db
+    Templatetags --> Template
+    Templatetags --> Utils
+    Urls --> Contrib
+    Urls --> Core
+    Urls --> Db
+    Urls --> Http
+    Urls --> Utils
+    Utils --> Contrib
+    Utils --> Core
+    Utils --> Db
+    Utils --> Dispatch
+    Utils --> Http
+    Utils --> Template
+    Views --> Contrib
+    Views --> Core
+    Views --> Db
+    Views --> Forms
+    Views --> Http
+    Views --> Middleware
+    Views --> Template
+    Views --> Urls
+    Views --> Utils
+        </pre>
+    </div>
+
+    
+    <div class="rationale">Package-based grouping (depth=2 after common prefix '') with dependency-affinity facade refinement (1362 entities reassigned).</div>
+    
+
+    <h2 id="components">Components</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Component</th>
+                <th>Responsibility</th>
+                <th>#</th>
+                
+                <th>Entities</th>
+            </tr>
+        </thead>
+        <tbody>
+        
+            <tr>
+                <td><strong>Default</strong></td>
+                <td>Entities in (default)</td>
+                <td>1</td>
+                
+                <td class="entity-list">django.setup</td>
+            </tr>
+        
+            <tr>
+                <td><strong>Django</strong></td>
+                <td>Entities in django</td>
+                <td>27</td>
+                
+                <td class="entity-list">django.__main__, django.conf.LazySettings, django.conf.LazySettings.__delattr__, django.conf.LazySettings.__getattr__, django.conf.LazySettings.__setattr__, django.conf.LazySettings._add_script_prefix, django.conf.LazySettings._show_deprecation_warning, django.conf.Settings, ... (+19 more)</td>
+            </tr>
+        
+            <tr>
+                <td><strong>Apps</strong></td>
+                <td>Entities in django.apps</td>
+                <td>32</td>
+                
+                <td class="entity-list">django.apps.config.AppConfig, django.apps.config.AppConfig.__repr__, django.apps.config.AppConfig._is_default_auto_field_overridden, django.apps.config.AppConfig.create, django.apps.config.AppConfig.get_model, django.apps.config.AppConfig.get_models, django.apps.config.AppConfig.ready, django.apps.registry.Apps, ... (+24 more)</td>
+            </tr>
+        
+            <tr>
+                <td><strong>Conf</strong></td>
+                <td>Entities in django.conf</td>
+                <td>93</td>
+                
+                <td class="entity-list">django.conf.global_settings.gettext_noop, django.conf.locale.ar.formats, django.conf.locale.ar_DZ.formats, django.conf.locale.az.formats, django.conf.locale.bg.formats, django.conf.locale.bn.formats, django.conf.locale.bs.formats, django.conf.locale.ca.formats, ... (+85 more)</td>
+            </tr>
+        
+            <tr>
+                <td><strong>Contrib</strong></td>
+                <td>Entities in django.contrib</td>
+                <td>2743</td>
+                
+                <td class="entity-list">django.conf.LazySettings.__repr__, django.conf.LazySettings.configure, django.conf.LazySettings.configured, django.contrib.admin.actions.delete_selected, django.contrib.admin.apps.AdminConfig, django.contrib.admin.apps.AdminConfig.ready, django.contrib.admin.apps.SimpleAdminConfig, django.contrib.admin.apps.SimpleAdminConfig.ready, ... (+2735 more)</td>
+            </tr>
+        
+            <tr>
+                <td><strong>Core</strong></td>
+                <td>Entities in django.core</td>
+                <td>1162</td>
+                
+                <td class="entity-list">django.apps.config.AppConfig.__init__, django.apps.config.AppConfig._path_from_module, django.apps.registry.Apps.check_apps_ready, django.apps.registry.Apps.check_models_ready, django.apps.registry.Apps.populate, django.apps.registry.Apps.set_installed_apps, django.conf.LazySettings._setup, django.contrib.admin.checks.BaseModelAdminChecks._check_autocomplete_fields_item, ... (+1154 more)</td>
+            </tr>
+        
+            <tr>
+                <td><strong>Db</strong></td>
+                <td>Entities in django.db</td>
+                <td>3267</td>
+                
+                <td class="entity-list">django.contrib.admin.checks.BaseModelAdminChecks._check_autocomplete_fields, django.contrib.admin.checks.BaseModelAdminChecks._check_field_spec, django.contrib.admin.checks.BaseModelAdminChecks._check_fields, django.contrib.admin.checks.BaseModelAdminChecks._check_fieldsets, django.contrib.admin.checks.BaseModelAdminChecks._check_fieldsets_item, django.contrib.admin.checks.BaseModelAdminChecks._check_filter_horizontal, django.contrib.admin.checks.BaseModelAdminChecks._check_filter_vertical, django.contrib.admin.checks.BaseModelAdminChecks._check_ordering, ... (+3259 more)</td>
+            </tr>
+        
+            <tr>
+                <td><strong>Dispatch</strong></td>
+                <td>Entities in django.dispatch</td>
+                <td>18</td>
+                
+                <td class="entity-list">django.contrib.auth.signals, django.db.models.signals.ModelSignal, django.dispatch.dispatcher.Signal, django.dispatch.dispatcher.Signal.__init__, django.dispatch.dispatcher.Signal._clear_dead_receivers, django.dispatch.dispatcher.Signal._live_receivers, django.dispatch.dispatcher.Signal._log_robust_failure, django.dispatch.dispatcher.Signal._remove_receiver, ... (+10 more)</td>
+            </tr>
+        
+            <tr>
+                <td><strong>Forms</strong></td>
+                <td>Entities in django.forms</td>
+                <td>489</td>
+                
+                <td class="entity-list">django.contrib.admin.checks.BaseModelAdminChecks._check_form, django.contrib.admin.checks.InlineModelAdminChecks._check_exclude_of_parent_model, django.contrib.admin.checks.InlineModelAdminChecks._check_formset, django.contrib.admin.checks.InlineModelAdminChecks._check_relation, django.contrib.admin.helpers.ActionForm, django.contrib.admin.helpers.AdminErrorList, django.contrib.admin.helpers.AdminField.__init__, django.contrib.admin.helpers.Fieldset.media, ... (+481 more)</td>
+            </tr>
+        
+            <tr>
+                <td><strong>Http</strong></td>
+                <td>Entities in django.http</td>
+                <td>198</td>
+                
+                <td class="entity-list">django.contrib.admindocs.views.ViewDetailView.get_context_data, django.contrib.auth.views.LoginView.form_valid, django.contrib.auth.views.LogoutView.post, django.contrib.gis.views.feed, django.contrib.sites.models.SiteManager._get_site_by_request, django.core.handlers.asgi.ASGIHandler.run_get_response, django.http.cookie.parse_cookie, django.http.multipartparser.BoundaryIter, ... (+190 more)</td>
+            </tr>
+        
+            <tr>
+                <td><strong>Middleware</strong></td>
+                <td>Entities in django.middleware</td>
+                <td>44</td>
+                
+                <td class="entity-list">django.middleware.cache.CacheMiddleware, django.middleware.cache.CacheMiddleware.__init__, django.middleware.cache.FetchFromCacheMiddleware.cache, django.middleware.cache.UpdateCacheMiddleware, django.middleware.cache.UpdateCacheMiddleware._should_update_cache, django.middleware.cache.UpdateCacheMiddleware.cache, django.middleware.clickjacking.XFrameOptionsMiddleware.process_response, django.middleware.common.BrokenLinkEmailsMiddleware, ... (+36 more)</td>
+            </tr>
+        
+            <tr>
+                <td><strong>Template</strong></td>
+                <td>Entities in django.template</td>
+                <td>410</td>
+                
+                <td class="entity-list">django.contrib.admin.options.ModelAdmin.render_delete_form, django.contrib.admin.sites.AdminSite.index, django.contrib.admin.templatetags.admin_list.admin_list_filter, django.contrib.admin.templatetags.admin_modify.submit_row, django.contrib.admin.templatetags.base.InclusionAdminNode, django.contrib.admin.templatetags.base.InclusionAdminNode.__init__, django.contrib.gis.gdal.field.OFTDate.value, django.contrib.gis.gdal.field.OFTTime.value, ... (+402 more)</td>
+            </tr>
+        
+            <tr>
+                <td><strong>Templatetags</strong></td>
+                <td>Entities in django.templatetags</td>
+                <td>43</td>
+                
+                <td class="entity-list">django.forms.widgets.Media.absolute_path, django.templatetags.cache.CacheNode, django.templatetags.cache.CacheNode.__init__, django.templatetags.cache.CacheNode.render, django.templatetags.i18n.BlockTranslateNode, django.templatetags.i18n.BlockTranslateNode.__init__, django.templatetags.i18n.BlockTranslateNode.__repr__, django.templatetags.i18n.BlockTranslateNode.render, ... (+35 more)</td>
+            </tr>
+        
+            <tr>
+                <td><strong>Urls</strong></td>
+                <td>Entities in django.urls</td>
+                <td>80</td>
+                
+                <td class="entity-list">django.contrib.admin.options.BaseModelAdmin.get_view_on_site_url, django.contrib.admin.sites.AdminSite.password_change, django.contrib.admin.widgets.AutocompleteMixin.get_url, django.contrib.admin.widgets.RelatedFieldWidgetWrapper.get_related_url, django.contrib.admindocs.views.ViewDetailView._get_view_func, django.contrib.gis.sitemaps.kml.KMLSitemap.location, django.core.handlers.base.BaseHandler.resolve_request, django.core.handlers.base.reset_urlconf, ... (+72 more)</td>
+            </tr>
+        
+            <tr>
+                <td><strong>Utils</strong></td>
+                <td>Entities in django.utils</td>
+                <td>1399</td>
+                
+                <td class="entity-list">django.apps.config.AppConfig.default_auto_field, django.apps.config.AppConfig.import_models, django.conf.UserSettingsHolder, django.conf.UserSettingsHolder.__setattr__, django.contrib.admin.autodiscover, django.contrib.admin.checks._contains_subclass, django.contrib.admin.helpers.AdminField.errors, django.contrib.admin.helpers.AdminField.label_tag, ... (+1391 more)</td>
+            </tr>
+        
+            <tr>
+                <td><strong>Views</strong></td>
+                <td>Entities in django.views</td>
+                <td>189</td>
+                
+                <td class="entity-list">django.contrib.admin.options.ModelAdmin.get_urls, django.contrib.admin.sites.AdminSite.i18n_javascript, django.contrib.auth._clean_credentials, django.contrib.auth.aauthenticate, django.views.csrf.builtin_template_path, django.views.csrf.csrf_failure, django.views.debug.CallableSettingWrapper, django.views.debug.CallableSettingWrapper.__init__, ... (+181 more)</td>
+            </tr>
+        
+            <tr>
+                <td><strong>Docs</strong></td>
+                <td>Entities in docs</td>
+                <td>1</td>
+                
+                <td class="entity-list">docs.conf</td>
+            </tr>
+        
+            <tr>
+                <td><strong>Ext</strong></td>
+                <td>Entities in docs._ext</td>
+                <td>40</td>
+                
+                <td class="entity-list">docs._ext.djangodocs.ConsoleDirective, docs._ext.djangodocs.ConsoleDirective.run, docs._ext.djangodocs.ConsoleNode, docs._ext.djangodocs.ConsoleNode.__getattr__, docs._ext.djangodocs.ConsoleNode.__init__, docs._ext.djangodocs.DjangoHTMLTranslator, docs._ext.djangodocs.DjangoHTMLTranslator.depart_desc_parameterlist, docs._ext.djangodocs.DjangoHTMLTranslator.depart_table, ... (+32 more)</td>
+            </tr>
+        
+            <tr>
+                <td><strong>Scripts</strong></td>
+                <td>Entities in scripts</td>
+                <td>6</td>
+                
+                <td class="entity-list">scripts.manage_translations._get_locale_dirs, scripts.manage_translations._tx_resource_for_name, scripts.manage_translations.add_common_arguments, scripts.manage_translations.fetch_since, scripts.manage_translations.list_resources_with_updates, scripts.manage_translations.update_catalogs</td>
+            </tr>
+        
+        </tbody>
+    </table>
+
+    <h2 id="smells">Architectural Smells (17)</h2>
+    
+    
+    <div class="smell high">
+        <div class="smell-header">
+            <span class="badge high">high</span>
+            <strong>SmellType.DEPENDENCY_CYCLE</strong>
+        </div>
+        <p class="smell-detail">Circular dependency among 15 components: Apps <-> Conf <-> Contrib <-> Core <-> Db <-> Dispatch <-> Django <-> Forms <-> Http <-> Middleware <-> Template <-> Templatetags <-> Urls <-> Utils <-> Views</p>
+        <p class="smell-detail"><strong>Why:</strong> Dependency cycles make components tightly coupled — you cannot change, test, or deploy any component in the cycle independently. This hinders maintainability, increases build times, and makes the system harder to understand.</p>
+        <p class="smell-detail"><strong>Fix:</strong> Break the cycle by introducing an interface/abstraction that one component depends on, inverting the dependency direction. Consider the Dependency Inversion Principle (DIP).</p>
+        <p class="smell-detail"><strong>Affects:</strong> Apps, Conf, Contrib, Core, Db, Dispatch, Django, Forms, Http, Middleware, Template, Templatetags, Urls, Utils, Views</p>
+    </div>
+    
+    <div class="smell medium">
+        <div class="smell-header">
+            <span class="badge medium">medium</span>
+            <strong>SmellType.CONCERN_OVERLOAD</strong>
+        </div>
+        <p class="smell-detail">Django contains 27 entities but only 2 internal dependencies (0.07 per entity), suggesting multiple responsibilities.</p>
+        <p class="smell-detail"><strong>Why:</strong> Large components are harder to understand, test, and maintain. When their internals are also sparsely connected, that usually means the component is acting as a bucket for unrelated concerns rather than a cohesive module.</p>
+        <p class="smell-detail"><strong>Fix:</strong> Consider splitting Django into smaller, focused components with single responsibilities.</p>
+        <p class="smell-detail"><strong>Affects:</strong> Django</p>
+    </div>
+    
+    <div class="smell high">
+        <div class="smell-header">
+            <span class="badge high">high</span>
+            <strong>SmellType.CONCERN_OVERLOAD</strong>
+        </div>
+        <p class="smell-detail">Conf contains 93 entities but only 5 internal dependencies (0.05 per entity), suggesting multiple responsibilities.</p>
+        <p class="smell-detail"><strong>Why:</strong> Large components are harder to understand, test, and maintain. When their internals are also sparsely connected, that usually means the component is acting as a bucket for unrelated concerns rather than a cohesive module.</p>
+        <p class="smell-detail"><strong>Fix:</strong> Consider splitting Conf into smaller, focused components with single responsibilities.</p>
+        <p class="smell-detail"><strong>Affects:</strong> Conf</p>
+    </div>
+    
+    <div class="smell high">
+        <div class="smell-header">
+            <span class="badge high">high</span>
+            <strong>SmellType.CONCERN_OVERLOAD</strong>
+        </div>
+        <p class="smell-detail">Http contains 198 entities but only 59 internal dependencies (0.30 per entity), suggesting multiple responsibilities.</p>
+        <p class="smell-detail"><strong>Why:</strong> Large components are harder to understand, test, and maintain. When their internals are also sparsely connected, that usually means the component is acting as a bucket for unrelated concerns rather than a cohesive module.</p>
+        <p class="smell-detail"><strong>Fix:</strong> Consider splitting Http into smaller, focused components with single responsibilities.</p>
+        <p class="smell-detail"><strong>Affects:</strong> Http</p>
+    </div>
+    
+    <div class="smell high">
+        <div class="smell-header">
+            <span class="badge high">high</span>
+            <strong>SmellType.CONCERN_OVERLOAD</strong>
+        </div>
+        <p class="smell-detail">Middleware contains 44 entities but only 7 internal dependencies (0.16 per entity), suggesting multiple responsibilities.</p>
+        <p class="smell-detail"><strong>Why:</strong> Large components are harder to understand, test, and maintain. When their internals are also sparsely connected, that usually means the component is acting as a bucket for unrelated concerns rather than a cohesive module.</p>
+        <p class="smell-detail"><strong>Fix:</strong> Consider splitting Middleware into smaller, focused components with single responsibilities.</p>
+        <p class="smell-detail"><strong>Affects:</strong> Middleware</p>
+    </div>
+    
+    <div class="smell high">
+        <div class="smell-header">
+            <span class="badge high">high</span>
+            <strong>SmellType.CONCERN_OVERLOAD</strong>
+        </div>
+        <p class="smell-detail">Template contains 410 entities but only 148 internal dependencies (0.36 per entity), suggesting multiple responsibilities.</p>
+        <p class="smell-detail"><strong>Why:</strong> Large components are harder to understand, test, and maintain. When their internals are also sparsely connected, that usually means the component is acting as a bucket for unrelated concerns rather than a cohesive module.</p>
+        <p class="smell-detail"><strong>Fix:</strong> Consider splitting Template into smaller, focused components with single responsibilities.</p>
+        <p class="smell-detail"><strong>Affects:</strong> Template</p>
+    </div>
+    
+    <div class="smell high">
+        <div class="smell-header">
+            <span class="badge high">high</span>
+            <strong>SmellType.CONCERN_OVERLOAD</strong>
+        </div>
+        <p class="smell-detail">Templatetags contains 43 entities but only 1 internal dependencies (0.02 per entity), suggesting multiple responsibilities.</p>
+        <p class="smell-detail"><strong>Why:</strong> Large components are harder to understand, test, and maintain. When their internals are also sparsely connected, that usually means the component is acting as a bucket for unrelated concerns rather than a cohesive module.</p>
+        <p class="smell-detail"><strong>Fix:</strong> Consider splitting Templatetags into smaller, focused components with single responsibilities.</p>
+        <p class="smell-detail"><strong>Affects:</strong> Templatetags</p>
+    </div>
+    
+    <div class="smell high">
+        <div class="smell-header">
+            <span class="badge high">high</span>
+            <strong>SmellType.CONCERN_OVERLOAD</strong>
+        </div>
+        <p class="smell-detail">Urls contains 80 entities but only 26 internal dependencies (0.33 per entity), suggesting multiple responsibilities.</p>
+        <p class="smell-detail"><strong>Why:</strong> Large components are harder to understand, test, and maintain. When their internals are also sparsely connected, that usually means the component is acting as a bucket for unrelated concerns rather than a cohesive module.</p>
+        <p class="smell-detail"><strong>Fix:</strong> Consider splitting Urls into smaller, focused components with single responsibilities.</p>
+        <p class="smell-detail"><strong>Affects:</strong> Urls</p>
+    </div>
+    
+    <div class="smell high">
+        <div class="smell-header">
+            <span class="badge high">high</span>
+            <strong>SmellType.CONCERN_OVERLOAD</strong>
+        </div>
+        <p class="smell-detail">Views contains 189 entities but only 67 internal dependencies (0.35 per entity), suggesting multiple responsibilities.</p>
+        <p class="smell-detail"><strong>Why:</strong> Large components are harder to understand, test, and maintain. When their internals are also sparsely connected, that usually means the component is acting as a bucket for unrelated concerns rather than a cohesive module.</p>
+        <p class="smell-detail"><strong>Fix:</strong> Consider splitting Views into smaller, focused components with single responsibilities.</p>
+        <p class="smell-detail"><strong>Affects:</strong> Views</p>
+    </div>
+    
+    <div class="smell medium">
+        <div class="smell-header">
+            <span class="badge medium">medium</span>
+            <strong>SmellType.CONCERN_OVERLOAD</strong>
+        </div>
+        <p class="smell-detail">Ext contains 40 entities but only 3 internal dependencies (0.07 per entity), suggesting multiple responsibilities.</p>
+        <p class="smell-detail"><strong>Why:</strong> Large components are harder to understand, test, and maintain. When their internals are also sparsely connected, that usually means the component is acting as a bucket for unrelated concerns rather than a cohesive module.</p>
+        <p class="smell-detail"><strong>Fix:</strong> Consider splitting Ext into smaller, focused components with single responsibilities.</p>
+        <p class="smell-detail"><strong>Affects:</strong> Ext</p>
+    </div>
+    
+    <div class="smell medium">
+        <div class="smell-header">
+            <span class="badge medium">medium</span>
+            <strong>SmellType.SCATTERED_FUNCTIONALITY</strong>
+        </div>
+        <p class="smell-detail">'Config' pattern is scattered across 3 components: Apps, Contrib, Db</p>
+        <p class="smell-detail"><strong>Why:</strong> When a single concern is spread across many components, changes to that concern require modifying multiple places, increasing the risk of inconsistencies and bugs.</p>
+        <p class="smell-detail"><strong>Fix:</strong> Centralize 'Config'-related functionality into a dedicated component to reduce scattering.</p>
+        <p class="smell-detail"><strong>Affects:</strong> Apps, Contrib, Db</p>
+    </div>
+    
+    <div class="smell high">
+        <div class="smell-header">
+            <span class="badge high">high</span>
+            <strong>SmellType.SCATTERED_FUNCTIONALITY</strong>
+        </div>
+        <p class="smell-detail">'Exception' pattern is scattered across 5 components: Contrib, Core, Http, Template, Utils</p>
+        <p class="smell-detail"><strong>Why:</strong> When a single concern is spread across many components, changes to that concern require modifying multiple places, increasing the risk of inconsistencies and bugs.</p>
+        <p class="smell-detail"><strong>Fix:</strong> Centralize 'Exception'-related functionality into a dedicated component to reduce scattering.</p>
+        <p class="smell-detail"><strong>Affects:</strong> Contrib, Core, Http, Template, Utils</p>
+    </div>
+    
+    <div class="smell high">
+        <div class="smell-header">
+            <span class="badge high">high</span>
+            <strong>SmellType.SCATTERED_FUNCTIONALITY</strong>
+        </div>
+        <p class="smell-detail">'Handler' pattern is scattered across 5 components: Contrib, Core, Db, Template, Utils</p>
+        <p class="smell-detail"><strong>Why:</strong> When a single concern is spread across many components, changes to that concern require modifying multiple places, increasing the risk of inconsistencies and bugs.</p>
+        <p class="smell-detail"><strong>Fix:</strong> Centralize 'Handler'-related functionality into a dedicated component to reduce scattering.</p>
+        <p class="smell-detail"><strong>Affects:</strong> Contrib, Core, Db, Template, Utils</p>
+    </div>
+    
+    <div class="smell medium">
+        <div class="smell-header">
+            <span class="badge medium">medium</span>
+            <strong>SmellType.LINK_OVERLOAD</strong>
+        </div>
+        <p class="smell-detail">Contrib is depended on by 10 other components (56% of all components).</p>
+        <p class="smell-detail"><strong>Why:</strong> A component with too many dependents becomes a bottleneck. Any change to it can cascade across the entire system, making evolution risky and expensive.</p>
+        <p class="smell-detail"><strong>Fix:</strong> Consider splitting Contrib into smaller interfaces so dependents only couple to what they actually use (ISP).</p>
+        <p class="smell-detail"><strong>Affects:</strong> Contrib</p>
+    </div>
+    
+    <div class="smell high">
+        <div class="smell-header">
+            <span class="badge high">high</span>
+            <strong>SmellType.LINK_OVERLOAD</strong>
+        </div>
+        <p class="smell-detail">Core is depended on by 14 other components (78% of all components).</p>
+        <p class="smell-detail"><strong>Why:</strong> A component with too many dependents becomes a bottleneck. Any change to it can cascade across the entire system, making evolution risky and expensive.</p>
+        <p class="smell-detail"><strong>Fix:</strong> Consider splitting Core into smaller interfaces so dependents only couple to what they actually use (ISP).</p>
+        <p class="smell-detail"><strong>Affects:</strong> Core</p>
+    </div>
+    
+    <div class="smell medium">
+        <div class="smell-header">
+            <span class="badge medium">medium</span>
+            <strong>SmellType.LINK_OVERLOAD</strong>
+        </div>
+        <p class="smell-detail">Db is depended on by 10 other components (56% of all components).</p>
+        <p class="smell-detail"><strong>Why:</strong> A component with too many dependents becomes a bottleneck. Any change to it can cascade across the entire system, making evolution risky and expensive.</p>
+        <p class="smell-detail"><strong>Fix:</strong> Consider splitting Db into smaller interfaces so dependents only couple to what they actually use (ISP).</p>
+        <p class="smell-detail"><strong>Affects:</strong> Db</p>
+    </div>
+    
+    <div class="smell high">
+        <div class="smell-header">
+            <span class="badge high">high</span>
+            <strong>SmellType.LINK_OVERLOAD</strong>
+        </div>
+        <p class="smell-detail">Utils is depended on by 15 other components (83% of all components).</p>
+        <p class="smell-detail"><strong>Why:</strong> A component with too many dependents becomes a bottleneck. Any change to it can cascade across the entire system, making evolution risky and expensive.</p>
+        <p class="smell-detail"><strong>Fix:</strong> Consider splitting Utils into smaller interfaces so dependents only couple to what they actually use (ISP).</p>
+        <p class="smell-detail"><strong>Affects:</strong> Utils</p>
+    </div>
+    
+    
+
+    <h2 id="dependencies">Dependency Summary</h2>
+    <div class="card">
+        <table>
+            <thead><tr><th>Package</th><th>Entities</th></tr></thead>
+            <tbody>
+            
+                <tr>
+                    <td><code>django.db.models</code></td>
+                    <td>1145</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.utils</code></td>
+                    <td>591</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.forms</code></td>
+                    <td>500</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.admin</code></td>
+                    <td>465</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.template</code></td>
+                    <td>396</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.db.models.fields</code></td>
+                    <td>382</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.auth</code></td>
+                    <td>358</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.db.migrations</code></td>
+                    <td>328</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.db.backends.base</code></td>
+                    <td>273</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.gis.gdal</code></td>
+                    <td>255</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.gis.geos</code></td>
+                    <td>250</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.db.models.sql</code></td>
+                    <td>237</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.db.migrations.operations</code></td>
+                    <td>229</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.postgres</code></td>
+                    <td>201</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.db.models.functions</code></td>
+                    <td>188</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.gis.db.models</code></td>
+                    <td>185</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.http</code></td>
+                    <td>185</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.db.backends.oracle</code></td>
+                    <td>182</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.core</code></td>
+                    <td>175</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.core.cache.backends</code></td>
+                    <td>160</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.db.backends.sqlite3</code></td>
+                    <td>157</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.views.generic</code></td>
+                    <td>156</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.sessions.backends</code></td>
+                    <td>154</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.core.management.commands</code></td>
+                    <td>151</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.db.backends.mysql</code></td>
+                    <td>145</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.postgres.fields</code></td>
+                    <td>120</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.core.serializers</code></td>
+                    <td>117</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.db.backends.postgresql</code></td>
+                    <td>107</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.urls</code></td>
+                    <td>91</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.contenttypes</code></td>
+                    <td>84</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.core.files.storage</code></td>
+                    <td>84</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.core.files</code></td>
+                    <td>83</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.templatetags</code></td>
+                    <td>83</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.staticfiles</code></td>
+                    <td>77</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.db.backends</code></td>
+                    <td>74</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.gis</code></td>
+                    <td>72</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.gis.geos.prototypes</code></td>
+                    <td>72</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.core.management</code></td>
+                    <td>71</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.gis.db.backends.postgis</code></td>
+                    <td>69</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.middleware</code></td>
+                    <td>63</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.utils.translation</code></td>
+                    <td>60</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.views</code></td>
+                    <td>60</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.core.handlers</code></td>
+                    <td>56</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.gis.db.backends.base</code></td>
+                    <td>53</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.messages.storage</code></td>
+                    <td>53</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.gis.gdal.raster</code></td>
+                    <td>52</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.gis.db.backends.oracle</code></td>
+                    <td>50</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.gis.db.backends.spatialite</code></td>
+                    <td>50</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.db</code></td>
+                    <td>48</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.core.checks</code></td>
+                    <td>47</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.template.backends</code></td>
+                    <td>43</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.postgres.forms</code></td>
+                    <td>41</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.admin.templatetags</code></td>
+                    <td>38</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.admindocs</code></td>
+                    <td>38</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib</code></td>
+                    <td>37</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.core.mail</code></td>
+                    <td>37</td>
+                </tr>
+            
+                <tr>
+                    <td><code>docs._ext</code></td>
+                    <td>37</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django</code></td>
+                    <td>36</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.apps</code></td>
+                    <td>32</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.gis.gdal.prototypes</code></td>
+                    <td>31</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.postgres.aggregates</code></td>
+                    <td>30</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.sites</code></td>
+                    <td>30</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.core.mail.backends</code></td>
+                    <td>30</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.gis.db.backends.mysql</code></td>
+                    <td>28</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.core.checks.security</code></td>
+                    <td>27</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.admin.views</code></td>
+                    <td>26</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.gis.utils</code></td>
+                    <td>25</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.messages</code></td>
+                    <td>25</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.template.loaders</code></td>
+                    <td>25</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.gis.forms</code></td>
+                    <td>22</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.core.servers</code></td>
+                    <td>22</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.views.decorators</code></td>
+                    <td>22</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.sessions</code></td>
+                    <td>19</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.staticfiles.management.commands</code></td>
+                    <td>19</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.flatpages</code></td>
+                    <td>17</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.syndication</code></td>
+                    <td>15</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.dispatch</code></td>
+                    <td>15</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.auth.management.commands</code></td>
+                    <td>14</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.auth.migrations</code></td>
+                    <td>14</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.gis.db.models.sql</code></td>
+                    <td>12</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.gis.management.commands</code></td>
+                    <td>9</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.gis.serializers</code></td>
+                    <td>9</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.gis.sitemaps</code></td>
+                    <td>9</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.db.backends.dummy</code></td>
+                    <td>9</td>
+                </tr>
+            
+                <tr>
+                    <td><code>scripts</code></td>
+                    <td>9</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.humanize.templatetags</code></td>
+                    <td>8</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.redirects</code></td>
+                    <td>7</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.sitemaps</code></td>
+                    <td>6</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.contenttypes.management.commands</code></td>
+                    <td>5</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.flatpages.templatetags</code></td>
+                    <td>4</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.gis.db.backends</code></td>
+                    <td>4</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.urls</code></td>
+                    <td>3</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.admin.migrations</code></td>
+                    <td>3</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.contenttypes.migrations</code></td>
+                    <td>3</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.gis.admin</code></td>
+                    <td>3</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.auth.handlers</code></td>
+                    <td>2</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.redirects.migrations</code></td>
+                    <td>2</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.sessions.management.commands</code></td>
+                    <td>2</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.sites.migrations</code></td>
+                    <td>2</td>
+                </tr>
+            
+                <tr>
+                    <td><code>(default)</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.ar</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.ar_DZ</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.az</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.bg</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.bn</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.bs</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.ca</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.ckb</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.cs</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.cy</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.da</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.de</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.de_CH</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.el</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.en</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.en_AU</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.en_CA</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.en_GB</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.en_IE</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.eo</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.es</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.es_AR</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.es_CO</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.es_MX</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.es_NI</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.es_PR</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.et</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.eu</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.fa</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.fi</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.fr</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.fr_BE</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.fr_CA</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.fr_CH</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.fy</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.ga</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.gd</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.gl</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.he</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.hi</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.hr</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.hu</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.id</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.ig</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.is</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.it</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.ja</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.ka</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.km</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.kn</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.ko</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.ky</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.lt</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.lv</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.mk</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.ml</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.mn</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.ms</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.nb</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.nl</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.nn</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.pl</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.pt</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.pt_BR</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.ro</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.ru</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.sk</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.sl</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.sq</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.sr</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.sr_Latn</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.sv</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.ta</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.te</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.tg</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.th</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.tk</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.tr</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.ug</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.uk</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.uz</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.vi</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.zh_Hans</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.conf.locale.zh_Hant</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.flatpages.migrations</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.humanize</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.contrib.sessions.migrations</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.core.cache</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>django.core.checks.compatibility</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>docs</code></td>
+                    <td>1</td>
+                </tr>
+            
+            </tbody>
+        </table>
+    </div>
+
+    <footer>
+        Generated by arcade-agent &mdash; software architecture analysis toolkit
+    </footer>
+
+    <script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+</body>
+</html>

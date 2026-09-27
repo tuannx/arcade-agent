@@ -1,0 +1,112 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Real-world evaluation · arcade-agent evaluation</title><style>
+:root{--bg:#0d1117;--fg:#e6edf3;--mut:#8b949e;--acc:#58a6ff;--card:#161b22;--line:#30363d;--ok:#3fb950;--warn:#d29922}
+*{box-sizing:border-box}body{background:var(--bg);color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;margin:0;line-height:1.6}
+.wrap{max-width:1020px;margin:0 auto;padding:0 24px}
+header.hero{padding:72px 0 40px;border-bottom:1px solid var(--line)}
+.hero h1{font-size:2.6rem;margin:0 0 8px}.hero h1 .a{color:var(--acc)}
+.hero p.sub{color:var(--mut);font-size:1.15rem;max-width:760px}
+.badges{margin:20px 0;display:flex;gap:10px;flex-wrap:wrap}
+.badge{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:4px 14px;font-size:.85rem;color:var(--mut)}
+.badge b{color:var(--fg)}
+.btn{display:inline-block;background:#1f6feb;color:#fff;padding:10px 22px;border-radius:8px;text-decoration:none;font-weight:600;margin:6px 8px 6px 0}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--fg)}
+h2{margin:48px 0 12px;font-size:1.6rem}h3{margin:28px 0 8px}
+table{width:100%;border-collapse:collapse;margin:16px 0;font-size:.95rem}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line)}
+th{color:var(--mut);font-weight:600}td.num{font-variant-numeric:tabular-nums}
+tr:hover td{background:#ffffff06}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px;margin:18px 0}
+.card h3{margin:0 0 6px}.card h3 a{color:var(--acc);text-decoration:none}
+.meta{color:var(--mut);font-size:.88rem;margin:8px 0}
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:16px 0}
+.kv div{background:#0d1117;border:1px solid var(--line);border-radius:8px;padding:10px 14px}
+.kv .v{font-size:1.35rem;font-weight:700}.kv .k{color:var(--mut);font-size:.8rem}
+.delta-up{color:var(--ok)}.delta-dn{color:#f85149}.delta-flat{color:var(--mut)}
+ul.tight li{margin:6px 0}code{background:#ffffff12;padding:2px 6px;border-radius:6px;font-size:.88em}
+pre{background:#0d1117;border:1px solid var(--line);border-radius:8px;padding:14px;overflow:auto;font-size:.85rem}
+footer{border-top:1px solid var(--line);margin-top:64px;padding:28px 0;color:var(--mut);font-size:.9rem}
+a{color:var(--acc)}nav.top{padding:14px 0;border-bottom:1px solid var(--line);font-size:.95rem}
+nav.top a{margin-right:18px;text-decoration:none;color:var(--mut)}nav.top a:hover{color:var(--fg)}
+.tag{display:inline-block;font-size:.75rem;border:1px solid var(--line);border-radius:12px;padding:1px 10px;color:var(--mut);margin-right:6px}
+</style></head>
+<body><nav class="top"><div class="wrap">
+<a href="./index.html"><b style="color:#e6edf3">arcade-agent</b> · evaluation</a>
+<a href="./index.html#scale">Scale benchmark</a>
+<a href="./index.html#prs">PR case studies</a>
+<a href="./index.html#method">Methodology</a>
+<a href="https://github.com/arcade-agent/arcade-agent">GitHub</a>
+</div></nav><div class="wrap">
+<header class="hero">
+<h1><span class="a">arcade-agent</span> in the wild</h1>
+<p class="sub">Can an AI-agent tool library recover the architecture of the world's largest
+open-source codebases — and narrate what a landmark pull request changed architecturally?
+We ran it on Django, React and Vue.js, then diffed the architecture across three large PRs.</p>
+<div class="badges">
+<span class="badge"><b>20,372</b> entities parsed</span>
+<span class="badge"><b>14,852</b> dependencies</span>
+<span class="badge"><b>3</b> large-PR case studies</span>
+<span class="badge">100% open methodology</span>
+</div>
+<a class="btn" href="https://github.com/arcade-agent/arcade-agent">Star on GitHub</a>
+<a class="btn ghost" href="#method">How it was measured</a>
+</header>
+
+<h2 id="scale">Scale benchmark</h2>
+<p>Full pipeline — <code>ingest → parse → recover (PKG) → detect_smells → compute_metrics</code> —
+on a shallow HEAD clone, tests excluded. One command per repo:</p>
+<pre>python -m asyncio -c "await analyze('/path/to/django', language='python')"</pre>
+<table><tr><th>Repository</th><th>Entities</th><th>Edges</th><th>Components</th><th>Smells</th><th>RCI</th><th>TurboMQ</th><th>Analysis time</th></tr><tr><td><a href='https://github.com/django/django'><b>Django</b></a> <a href='./reports/django_report.html' class='tag'>report</a></td><td class='num'>10,881</td><td class='num'>8,901</td><td class='num'>21</td><td class='num'>18</td><td class='num'>0.660</td><td class='num'>9.9</td><td class='num'>1s</td></tr><tr><td><a href='https://github.com/facebook/react'><b>React</b></a> <a href='./reports/react_report.html' class='tag'>report</a></td><td class='num'>7,861</td><td class='num'>4,221</td><td class='num'>7</td><td class='num'>7</td><td class='num'>0.965</td><td class='num'>2.5</td><td class='num'>8s</td></tr><tr><td><a href='https://github.com/vuejs/core'><b>Vue.js</b></a> <a href='./reports/vue_report.html' class='tag'>report</a></td><td class='num'>1,630</td><td class='num'>1,730</td><td class='num'>6</td><td class='num'>2</td><td class='num'>1.000</td><td class='num'>1.0</td><td class='num'>1s</td></tr></table>
+<p class="meta">RCI = relative cluster index (cohesion); TurboMQ = Bunch-style modularization quality (higher = better).
+Times measured on a single commodity VM, cold parse, tree-sitter based.</p>
+
+<h2 id="prs">Large-PR case studies</h2>
+<p>For each PR we recovered the architecture at the base commit and at the merge commit,
+then ran <code>changelog_architecture</code> — the same tool arcade-agent's GitHub Action uses
+to comment on PRs. Click through for the full architectural changelog.</p>
+<div class="card"><h3><a href="./pr-react-37187.html">react #37187</a></h3>
+<div class="meta">[DevTools] Remove the dead Timeline profiler code</div>
+<div class="kv">
+<div><div class="v">8,178 → 7,868</div><div class="k">entities</div></div>
+<div><div class="v">7 → 7 <span class="delta-flat">(+0)</span></div><div class="k">components</div></div>
+<div><div class="v">7 → 7 <span class="delta-flat">(+0)</span></div><div class="k">smells</div></div>
+</div>
+<div class="meta"><a href="https://github.com/facebook/react/pull/37187">View PR on GitHub ↗</a></div></div><div class="card"><h3><a href="./pr-vue-15633.html">vue #15633</a></h3>
+<div class="meta">chore: migrate to Vitest 5 with Vite+</div>
+<div class="kv">
+<div><div class="v">2,779 → 2,754</div><div class="k">entities</div></div>
+<div><div class="v">5 → 5 <span class="delta-flat">(+0)</span></div><div class="k">components</div></div>
+<div><div class="v">2 → 2 <span class="delta-flat">(+0)</span></div><div class="k">smells</div></div>
+</div>
+<div class="meta"><a href="https://github.com/vuejs/core/pull/15633">View PR on GitHub ↗</a></div></div><div class="card"><h3><a href="./pr-django-18036.html">django #18036</a></h3>
+<div class="meta">Fixed #35303 -- Added async auth backends and associated functionality</div>
+<div class="kv">
+<div><div class="v">10,242 → 10,284</div><div class="k">entities</div></div>
+<div><div class="v">19 → 19 <span class="delta-flat">(+0)</span></div><div class="k">components</div></div>
+<div><div class="v">17 → 17 <span class="delta-flat">(+0)</span></div><div class="k">smells</div></div>
+</div>
+<div class="meta"><a href="https://github.com/django/django/pull/18036">View PR on GitHub ↗</a></div></div>
+
+<h2 id="method">Methodology &amp; reproducibility</h2>
+<ul class="tight">
+<li><b>Parser:</b> tree-sitter per language (Python, TypeScript/JavaScript). Test, vendor and build directories excluded.</li>
+<li><b>Recovery:</b> PKG algorithm (package-structure clustering), identical settings for every repo and every revision.</li>
+<li><b>PR diffing:</b> <code>ingest(ref=&lt;base_sha&gt;)</code> and <code>ingest(ref=&lt;head_sha&gt;)</code> materialize each revision without touching the working tree.</li>
+<li><b>Honesty note:</b> recovered architectures are heuristic approximations. Component names come from package structure; smell detection is threshold-based unless <code>--use-llm</code> is enabled.</li>
+<li><b>Reproduce:</b> <code>pip install "arcade-agent[languages]"</code>, then run the scripts in
+<a href="https://github.com/tuannx/arcade-agent/tree/gh-pages/evaluation">tuannx/arcade-agent/evaluation</a> (gh-pages branch).</li>
+</ul>
+
+<h2>What this proves</h2>
+<ul class="tight">
+<li><b>For AI-agent builders:</b> a single <code>analyze()</code> call gives an agent a structural map of a 10k-file codebase in minutes — cheaper than reading files.</li>
+<li><b>For maintainers:</b> <code>changelog_architecture</code> turns "what did this PR do to our architecture?" from a manual review question into a computed answer.</li>
+<li><b>For everyone:</b> architecture recovery isn't a research toy anymore — it runs on Django, React and Vue at commodity cost.</li>
+</ul>
+</div><footer><div class="wrap">
+<p>Evaluation generated with <a href="https://github.com/arcade-agent/arcade-agent">arcade-agent</a> (open-source, MIT).
+Results are automatically recovered architecture views — heuristic, not ground truth.
+<a href="https://github.com/tuannx/arcade-agent">Fork with this evaluation</a>.</p>
+<p style="color:#6e7681">Built 2026-09-27 · Xuan / AI Kit LLC</p>
+</div></footer></body></html>

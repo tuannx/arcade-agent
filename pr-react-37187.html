@@ -1,0 +1,194 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>react #37187 · arcade-agent evaluation</title><style>
+:root{--bg:#0d1117;--fg:#e6edf3;--mut:#8b949e;--acc:#58a6ff;--card:#161b22;--line:#30363d;--ok:#3fb950;--warn:#d29922}
+*{box-sizing:border-box}body{background:var(--bg);color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;margin:0;line-height:1.6}
+.wrap{max-width:1020px;margin:0 auto;padding:0 24px}
+header.hero{padding:72px 0 40px;border-bottom:1px solid var(--line)}
+.hero h1{font-size:2.6rem;margin:0 0 8px}.hero h1 .a{color:var(--acc)}
+.hero p.sub{color:var(--mut);font-size:1.15rem;max-width:760px}
+.badges{margin:20px 0;display:flex;gap:10px;flex-wrap:wrap}
+.badge{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:4px 14px;font-size:.85rem;color:var(--mut)}
+.badge b{color:var(--fg)}
+.btn{display:inline-block;background:#1f6feb;color:#fff;padding:10px 22px;border-radius:8px;text-decoration:none;font-weight:600;margin:6px 8px 6px 0}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--fg)}
+h2{margin:48px 0 12px;font-size:1.6rem}h3{margin:28px 0 8px}
+table{width:100%;border-collapse:collapse;margin:16px 0;font-size:.95rem}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line)}
+th{color:var(--mut);font-weight:600}td.num{font-variant-numeric:tabular-nums}
+tr:hover td{background:#ffffff06}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px;margin:18px 0}
+.card h3{margin:0 0 6px}.card h3 a{color:var(--acc);text-decoration:none}
+.meta{color:var(--mut);font-size:.88rem;margin:8px 0}
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:16px 0}
+.kv div{background:#0d1117;border:1px solid var(--line);border-radius:8px;padding:10px 14px}
+.kv .v{font-size:1.35rem;font-weight:700}.kv .k{color:var(--mut);font-size:.8rem}
+.delta-up{color:var(--ok)}.delta-dn{color:#f85149}.delta-flat{color:var(--mut)}
+ul.tight li{margin:6px 0}code{background:#ffffff12;padding:2px 6px;border-radius:6px;font-size:.88em}
+pre{background:#0d1117;border:1px solid var(--line);border-radius:8px;padding:14px;overflow:auto;font-size:.85rem}
+footer{border-top:1px solid var(--line);margin-top:64px;padding:28px 0;color:var(--mut);font-size:.9rem}
+a{color:var(--acc)}nav.top{padding:14px 0;border-bottom:1px solid var(--line);font-size:.95rem}
+nav.top a{margin-right:18px;text-decoration:none;color:var(--mut)}nav.top a:hover{color:var(--fg)}
+.tag{display:inline-block;font-size:.75rem;border:1px solid var(--line);border-radius:12px;padding:1px 10px;color:var(--mut);margin-right:6px}
+</style></head>
+<body><nav class="top"><div class="wrap">
+<a href="./index.html"><b style="color:#e6edf3">arcade-agent</b> · evaluation</a>
+<a href="./index.html#scale">Scale benchmark</a>
+<a href="./index.html#prs">PR case studies</a>
+<a href="./index.html#method">Methodology</a>
+<a href="https://github.com/arcade-agent/arcade-agent">GitHub</a>
+</div></nav><div class="wrap">
+<header class="hero" style="padding:48px 0 24px">
+<p class="meta"><a href="./index.html">← all case studies</a></p>
+<h1 style="font-size:2rem">react <a href="https://github.com/facebook/react/pull/37187">#37187</a></h1>
+<p class="sub">[DevTools] Remove the dead Timeline profiler code</p>
+<div class="badges"><span class="badge">base <code>44fe7e95</code></span>
+<span class="badge">head <code>c89931b2</code></span></div>
+</header>
+<div class='card'><h3>What the tool saw</h3><p>19,239 lines deleted — and the architecture didn't move. Every recovered component is stable: no additions, removals, renames, splits or merges, and zero responsibility shifts. Metric deltas are noise (TurboMQ −0.005, RCI −0.004). That is exactly the answer a reviewer wants from a dead-code removal PR: <b>surgical, zero architectural risk, safe to merge</b> — computed, not guessed.</p><ul class='tight'><li>310 entities deleted, 0 added — the deletion is visible and quantified</li><li>7/7 components stable at PKG granularity — nothing was restructured</li><li>Persisting finding the tool keeps surfacing: a medium-severity dependency cycle <code>Compiler ↔ Fixtures ↔ Packages</code> that survived the deletion</li></ul></div>
+<div class="kv">
+<div><div class="v">8,178 → 7,868</div><div class="k">entities</div></div>
+<div><div class="v">4,674 → 4,203</div><div class="k">dependency edges</div></div>
+<div><div class="v">7 → 7</div><div class="k">recovered components</div></div>
+<div><div class="v">7 → 7</div><div class="k">architectural smells</div></div>
+</div>
+<h2>Architectural changelog</h2>
+<p class="meta">Computed by <code>changelog_architecture(base, head)</code> — components added/removed/renamed/rewritten/split/merged, entity moves, smell &amp; metric deltas.</p>
+<pre>{
+  "refs": {
+    "a": "PR#37187 base 44fe7e95",
+    "b": "PR#37187 head c89931b2"
+  },
+  "components": {
+    "added": [],
+    "removed": [],
+    "renamed": [],
+    "split": [],
+    "merged": [],
+    "rewritten": [],
+    "stable": [
+      "Babel",
+      "Compiler",
+      "Default",
+      "Fixtures",
+      "Flow-Typed",
+      "Packages",
+      "Scripts"
+    ]
+  },
+  "responsibility_shifts": [],
+  "smells": {
+    "new": [],
+    "resolved": [],
+    "persisting": [
+      {
+        "smell_type": "Concern Overload",
+        "severity": "high",
+        "affected_components": [
+          "Fixtures"
+        ],
+        "description": "Fixtures contains 701 entities but only 42 internal dependencies (0.06 per entity), suggesting multiple responsibilities."
+      },
+      {
+        "smell_type": "Concern Overload",
+        "severity": "high",
+        "affected_components": [
+          "Scripts"
+        ],
+        "description": "Scripts contains 375 entities but only 0 internal dependencies (0.00 per entity), suggesting multiple responsibilities."
+      },
+      {
+        "smell_type": "Dependency Cycle",
+        "severity": "medium",
+        "affected_components": [
+          "Compiler",
+          "Fixtures",
+          "Packages"
+        ],
+        "description": "Circular dependency among 3 components: Compiler <-> Fixtures <-> Packages"
+      },
+      {
+        "smell_type": "Scattered Parasitic Functionality",
+        "severity": "medium",
+        "affected_components": [
+          "Compiler",
+          "Fixtures",
+          "Packages"
+        ],
+        "description": "'Provider' pattern is scattered across 3 components: Compiler, Fixtures, Packages"
+      },
+      {
+        "smell_type": "Scattered Parasitic Functionality",
+        "severity": "medium",
+        "affected_components": [
+          "Compiler",
+          "Packages",
+          "Scripts"
+        ],
+        "description": "'Helper' pattern is scattered across 3 components: Compiler, Packages, Scripts"
+      }
+    ]
+  },
+  "metrics": {
+    "BasicMQ": {
+      "a": 0.3623,
+      "b": 0.3617,
+      "delta": -0.0005999999999999894
+    },
+    "InterConnectivity": {
+      "a": 0.0,
+      "b": 0.0,
+      "delta": 0.0
+    },
+    "IntraConnectivity": {
+      "a": 0.0001,
+      "b": 0.0001,
+      "delta": 0.0
+    },
+    "RCI": {
+      "a": 0.966,
+      "b": 0.9622,
+      "delta": -0.0037999999999999146
+    },
+    "TurboMQ": {
+      "a": 2.5364,
+      "b": 2.5318,
+      "delta": -0.0045999999999999375
+    },
+    "TwoWayPairRatio": {
+      "a": 0.6667,
+      "b": 0.6667,
+      "delta": 0.0
+    }
+  },
+  "languages": {
+    "a": [
+      "typescript"
+    ],
+    "b": [
+      "typescript"
+    ]
+  },
+  "summary": {
+    "components_a": 7,
+    "components_b": 7,
+    "shifts": 0,
+    "entities_a": 8178,
+    "entities_b": 7868,
+    "entities_added": 0,
+    "entities_deleted": 310,
+    "smells_new": 0,
+    "smells_resolved": 0
+  }
+}</pre>
+<p class="meta">Full JSON: <code>eval_out/pr_react-37187.json</code> in the
+<a href="https://github.com/tuannx/arcade-agent/tree/gh-pages/evaluation">evaluation folder</a>.
+Full interactive reports: <a href="./reports/pr_react-37187_base.html">base</a> ·
+<a href="./reports/pr_react-37187_head.html">head</a>.
+Discuss this PR: <a href="https://github.com/facebook/react/pull/37187">https://github.com/facebook/react/pull/37187</a></p>
+</div><footer><div class="wrap">
+<p>Evaluation generated with <a href="https://github.com/arcade-agent/arcade-agent">arcade-agent</a> (open-source, MIT).
+Results are automatically recovered architecture views — heuristic, not ground truth.
+<a href="https://github.com/tuannx/arcade-agent">Fork with this evaluation</a>.</p>
+<p style="color:#6e7681">Built 2026-09-27 · Xuan / AI Kit LLC</p>
+</div></footer></body></html>

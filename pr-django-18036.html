@@ -1,0 +1,331 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>django #18036 · arcade-agent evaluation</title><style>
+:root{--bg:#0d1117;--fg:#e6edf3;--mut:#8b949e;--acc:#58a6ff;--card:#161b22;--line:#30363d;--ok:#3fb950;--warn:#d29922}
+*{box-sizing:border-box}body{background:var(--bg);color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;margin:0;line-height:1.6}
+.wrap{max-width:1020px;margin:0 auto;padding:0 24px}
+header.hero{padding:72px 0 40px;border-bottom:1px solid var(--line)}
+.hero h1{font-size:2.6rem;margin:0 0 8px}.hero h1 .a{color:var(--acc)}
+.hero p.sub{color:var(--mut);font-size:1.15rem;max-width:760px}
+.badges{margin:20px 0;display:flex;gap:10px;flex-wrap:wrap}
+.badge{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:4px 14px;font-size:.85rem;color:var(--mut)}
+.badge b{color:var(--fg)}
+.btn{display:inline-block;background:#1f6feb;color:#fff;padding:10px 22px;border-radius:8px;text-decoration:none;font-weight:600;margin:6px 8px 6px 0}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--fg)}
+h2{margin:48px 0 12px;font-size:1.6rem}h3{margin:28px 0 8px}
+table{width:100%;border-collapse:collapse;margin:16px 0;font-size:.95rem}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line)}
+th{color:var(--mut);font-weight:600}td.num{font-variant-numeric:tabular-nums}
+tr:hover td{background:#ffffff06}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px;margin:18px 0}
+.card h3{margin:0 0 6px}.card h3 a{color:var(--acc);text-decoration:none}
+.meta{color:var(--mut);font-size:.88rem;margin:8px 0}
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:16px 0}
+.kv div{background:#0d1117;border:1px solid var(--line);border-radius:8px;padding:10px 14px}
+.kv .v{font-size:1.35rem;font-weight:700}.kv .k{color:var(--mut);font-size:.8rem}
+.delta-up{color:var(--ok)}.delta-dn{color:#f85149}.delta-flat{color:var(--mut)}
+ul.tight li{margin:6px 0}code{background:#ffffff12;padding:2px 6px;border-radius:6px;font-size:.88em}
+pre{background:#0d1117;border:1px solid var(--line);border-radius:8px;padding:14px;overflow:auto;font-size:.85rem}
+footer{border-top:1px solid var(--line);margin-top:64px;padding:28px 0;color:var(--mut);font-size:.9rem}
+a{color:var(--acc)}nav.top{padding:14px 0;border-bottom:1px solid var(--line);font-size:.95rem}
+nav.top a{margin-right:18px;text-decoration:none;color:var(--mut)}nav.top a:hover{color:var(--fg)}
+.tag{display:inline-block;font-size:.75rem;border:1px solid var(--line);border-radius:12px;padding:1px 10px;color:var(--mut);margin-right:6px}
+</style></head>
+<body><nav class="top"><div class="wrap">
+<a href="./index.html"><b style="color:#e6edf3">arcade-agent</b> · evaluation</a>
+<a href="./index.html#scale">Scale benchmark</a>
+<a href="./index.html#prs">PR case studies</a>
+<a href="./index.html#method">Methodology</a>
+<a href="https://github.com/arcade-agent/arcade-agent">GitHub</a>
+</div></nav><div class="wrap">
+<header class="hero" style="padding:48px 0 24px">
+<p class="meta"><a href="./index.html">← all case studies</a></p>
+<h1 style="font-size:2rem">django <a href="https://github.com/django/django/pull/18036">#18036</a></h1>
+<p class="sub">Fixed #35303 -- Added async auth backends and associated functionality</p>
+<div class="badges"><span class="badge">base <code>d876be79</code></span>
+<span class="badge">head <code>3ab611d7</code></span></div>
+</header>
+<div class='card'><h3>What the tool saw</h3><p>A new capability — async auth backends — landed with essentially <b>zero architectural disturbance</b>. +43 entities, 19/19 components stable, metrics flat (RCI −0.0001). The only movement worth noting: <code>aauthenticate</code> settling from Views into Contrib and <code>aget_user</code> from Contrib into Utils — the new async variants finding their architectural homes. This is the 'safe feature PR' signal maintainers want in CI.</p><ul class='tight'><li>+43 entities / 1 deleted — pure addition, no restructuring</li><li>2 responsibility shifts pinpoint the new async surface</li><li>Smell count unchanged (17 → 17) — no new architectural debt introduced</li></ul></div>
+<div class="kv">
+<div><div class="v">10,242 → 10,284</div><div class="k">entities</div></div>
+<div><div class="v">8,141 → 8,155</div><div class="k">dependency edges</div></div>
+<div><div class="v">19 → 19</div><div class="k">recovered components</div></div>
+<div><div class="v">17 → 17</div><div class="k">architectural smells</div></div>
+</div>
+<h2>Architectural changelog</h2>
+<p class="meta">Computed by <code>changelog_architecture(base, head)</code> — components added/removed/renamed/rewritten/split/merged, entity moves, smell &amp; metric deltas.</p>
+<pre>{
+  "refs": {
+    "a": "PR#18036 base d876be79",
+    "b": "PR#18036 head 3ab611d7"
+  },
+  "components": {
+    "added": [],
+    "removed": [],
+    "renamed": [],
+    "split": [],
+    "merged": [],
+    "rewritten": [],
+    "stable": [
+      "Apps",
+      "Conf",
+      "Contrib",
+      "Core",
+      "Db",
+      "Default",
+      "Dispatch",
+      "Django",
+      "Docs",
+      "Ext",
+      "Forms",
+      "Http",
+      "Middleware",
+      "Scripts",
+      "Template",
+      "Templatetags",
+      "Urls",
+      "Utils",
+      "Views"
+    ]
+  },
+  "responsibility_shifts": [
+    {
+      "entity": "django.contrib.auth.aauthenticate",
+      "from": "Views",
+      "to": "Contrib"
+    },
+    {
+      "entity": "django.contrib.auth.aget_user",
+      "from": "Contrib",
+      "to": "Utils"
+    }
+  ],
+  "smells": {
+    "new": [],
+    "resolved": [],
+    "persisting": [
+      {
+        "smell_type": "Concern Overload",
+        "severity": "high",
+        "affected_components": [
+          "Conf"
+        ],
+        "description": "Conf contains 93 entities but only 5 internal dependencies (0.05 per entity), suggesting multiple responsibilities."
+      },
+      {
+        "smell_type": "Concern Overload",
+        "severity": "medium",
+        "affected_components": [
+          "Django"
+        ],
+        "description": "Django contains 27 entities but only 2 internal dependencies (0.07 per entity), suggesting multiple responsibilities."
+      },
+      {
+        "smell_type": "Concern Overload",
+        "severity": "medium",
+        "affected_components": [
+          "Ext"
+        ],
+        "description": "Ext contains 40 entities but only 3 internal dependencies (0.07 per entity), suggesting multiple responsibilities."
+      },
+      {
+        "smell_type": "Concern Overload",
+        "severity": "high",
+        "affected_components": [
+          "Http"
+        ],
+        "description": "Http contains 198 entities but only 59 internal dependencies (0.30 per entity), suggesting multiple responsibilities."
+      },
+      {
+        "smell_type": "Concern Overload",
+        "severity": "high",
+        "affected_components": [
+          "Middleware"
+        ],
+        "description": "Middleware contains 44 entities but only 7 internal dependencies (0.16 per entity), suggesting multiple responsibilities."
+      },
+      {
+        "smell_type": "Concern Overload",
+        "severity": "high",
+        "affected_components": [
+          "Template"
+        ],
+        "description": "Template contains 410 entities but only 148 internal dependencies (0.36 per entity), suggesting multiple responsibilities."
+      },
+      {
+        "smell_type": "Concern Overload",
+        "severity": "high",
+        "affected_components": [
+          "Templatetags"
+        ],
+        "description": "Templatetags contains 43 entities but only 1 internal dependencies (0.02 per entity), suggesting multiple responsibilities."
+      },
+      {
+        "smell_type": "Concern Overload",
+        "severity": "high",
+        "affected_components": [
+          "Urls"
+        ],
+        "description": "Urls contains 80 entities but only 26 internal dependencies (0.33 per entity), suggesting multiple responsibilities."
+      },
+      {
+        "smell_type": "Concern Overload",
+        "severity": "high",
+        "affected_components": [
+          "Views"
+        ],
+        "description": "Views contains 188 entities but only 66 internal dependencies (0.35 per entity), suggesting multiple responsibilities."
+      },
+      {
+        "smell_type": "Dependency Cycle",
+        "severity": "high",
+        "affected_components": [
+          "Apps",
+          "Conf",
+          "Contrib",
+          "Core",
+          "Db",
+          "Dispatch",
+          "Django",
+          "Forms",
+          "Http",
+          "Middleware",
+          "Template",
+          "Templatetags",
+          "Urls",
+          "Utils",
+          "Views"
+        ],
+        "description": "Circular dependency among 15 components: Apps <-> Conf <-> Contrib <-> Core <-> Db <-> Dispatch <-> Django <-> Forms <-> Http <-> Middleware <-> Template <-> Templatetags <-> Urls <-> Utils <-> Views"
+      },
+      {
+        "smell_type": "Link/Upstream Overload",
+        "severity": "medium",
+        "affected_components": [
+          "Contrib"
+        ],
+        "description": "Contrib is depended on by 10 other components (56% of all components)."
+      },
+      {
+        "smell_type": "Link/Upstream Overload",
+        "severity": "high",
+        "affected_components": [
+          "Core"
+        ],
+        "description": "Core is depended on by 14 other components (78% of all components)."
+      },
+      {
+        "smell_type": "Link/Upstream Overload",
+        "severity": "medium",
+        "affected_components": [
+          "Db"
+        ],
+        "description": "Db is depended on by 10 other components (56% of all components)."
+      },
+      {
+        "smell_type": "Link/Upstream Overload",
+        "severity": "high",
+        "affected_components": [
+          "Utils"
+        ],
+        "description": "Utils is depended on by 15 other components (83% of all components)."
+      },
+      {
+        "smell_type": "Scattered Parasitic Functionality",
+        "severity": "medium",
+        "affected_components": [
+          "Apps",
+          "Contrib",
+          "Db"
+        ],
+        "description": "'Config' pattern is scattered across 3 components: Apps, Contrib, Db"
+      },
+      {
+        "smell_type": "Scattered Parasitic Functionality",
+        "severity": "high",
+        "affected_components": [
+          "Contrib",
+          "Core",
+          "Db",
+          "Template",
+          "Utils"
+        ],
+        "description": "'Handler' pattern is scattered across 5 components: Contrib, Core, Db, Template, Utils"
+      },
+      {
+        "smell_type": "Scattered Parasitic Functionality",
+        "severity": "high",
+        "affected_components": [
+          "Contrib",
+          "Core",
+          "Http",
+          "Template",
+          "Utils"
+        ],
+        "description": "'Exception' pattern is scattered across 5 components: Contrib, Core, Http, Template, Utils"
+      }
+    ]
+  },
+  "metrics": {
+    "BasicMQ": {
+      "a": 0.3936,
+      "b": 0.3933,
+      "delta": -0.00030000000000002247
+    },
+    "InterConnectivity": {
+      "a": 0.0002,
+      "b": 0.0002,
+      "delta": 0.0
+    },
+    "IntraConnectivity": {
+      "a": 0.0028,
+      "b": 0.0028,
+      "delta": 0.0
+    },
+    "RCI": {
+      "a": 0.6599,
+      "b": 0.6598,
+      "delta": -9.999999999998899e-05
+    },
+    "TurboMQ": {
+      "a": 7.4789,
+      "b": 7.4726,
+      "delta": -0.006300000000000416
+    },
+    "TwoWayPairRatio": {
+      "a": 0.3056,
+      "b": 0.3056,
+      "delta": 0.0
+    }
+  },
+  "languages": {
+    "a": [
+      "python"
+    ],
+    "b": [
+      "python"
+    ]
+  },
+  "summary": {
+    "components_a": 19,
+    "components_b": 19,
+    "shifts": 2,
+    "entities_a": 10242,
+    "entities_b": 10284,
+    "entities_added": 43,
+    "entities_deleted": 1,
+    "smells_new": 0,
+    "smells_resolved": 0
+  }
+}</pre>
+<p class="meta">Full JSON: <code>eval_out/pr_django-18036.json</code> in the
+<a href="https://github.com/tuannx/arcade-agent/tree/gh-pages/evaluation">evaluation folder</a>.
+Full interactive reports: <a href="./reports/pr_django-18036_base.html">base</a> ·
+<a href="./reports/pr_django-18036_head.html">head</a>.
+Discuss this PR: <a href="https://github.com/django/django/pull/18036">https://github.com/django/django/pull/18036</a></p>
+</div><footer><div class="wrap">
+<p>Evaluation generated with <a href="https://github.com/arcade-agent/arcade-agent">arcade-agent</a> (open-source, MIT).
+Results are automatically recovered architecture views — heuristic, not ground truth.
+<a href="https://github.com/tuannx/arcade-agent">Fork with this evaluation</a>.</p>
+<p style="color:#6e7681">Built 2026-09-27 · Xuan / AI Kit LLC</p>
+</div></footer></body></html>

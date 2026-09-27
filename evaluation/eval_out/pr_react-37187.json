@@ -1,0 +1,147 @@
+{
+  "repo": "react",
+  "pr": 37187,
+  "title": "[DevTools] Remove the dead Timeline profiler code",
+  "url": "https://github.com/facebook/react/pull/37187",
+  "base": "44fe7e953a05",
+  "head": "c89931b2c4e0",
+  "base_stats": {
+    "entities": 8178,
+    "edges": 4674,
+    "components": 7,
+    "smells": 7
+  },
+  "head_stats": {
+    "entities": 7868,
+    "edges": 4203,
+    "components": 7,
+    "smells": 7
+  },
+  "changelog": {
+    "refs": {
+      "a": "PR#37187 base 44fe7e95",
+      "b": "PR#37187 head c89931b2"
+    },
+    "components": {
+      "added": [],
+      "removed": [],
+      "renamed": [],
+      "split": [],
+      "merged": [],
+      "rewritten": [],
+      "stable": [
+        "Babel",
+        "Compiler",
+        "Default",
+        "Fixtures",
+        "Flow-Typed",
+        "Packages",
+        "Scripts"
+      ]
+    },
+    "responsibility_shifts": [],
+    "smells": {
+      "new": [],
+      "resolved": [],
+      "persisting": [
+        {
+          "smell_type": "Concern Overload",
+          "severity": "high",
+          "affected_components": [
+            "Fixtures"
+          ],
+          "description": "Fixtures contains 701 entities but only 42 internal dependencies (0.06 per entity), suggesting multiple responsibilities."
+        },
+        {
+          "smell_type": "Concern Overload",
+          "severity": "high",
+          "affected_components": [
+            "Scripts"
+          ],
+          "description": "Scripts contains 375 entities but only 0 internal dependencies (0.00 per entity), suggesting multiple responsibilities."
+        },
+        {
+          "smell_type": "Dependency Cycle",
+          "severity": "medium",
+          "affected_components": [
+            "Compiler",
+            "Fixtures",
+            "Packages"
+          ],
+          "description": "Circular dependency among 3 components: Compiler <-> Fixtures <-> Packages"
+        },
+        {
+          "smell_type": "Scattered Parasitic Functionality",
+          "severity": "medium",
+          "affected_components": [
+            "Compiler",
+            "Fixtures",
+            "Packages"
+          ],
+          "description": "'Provider' pattern is scattered across 3 components: Compiler, Fixtures, Packages"
+        },
+        {
+          "smell_type": "Scattered Parasitic Functionality",
+          "severity": "medium",
+          "affected_components": [
+            "Compiler",
+            "Packages",
+            "Scripts"
+          ],
+          "description": "'Helper' pattern is scattered across 3 components: Compiler, Packages, Scripts"
+        }
+      ]
+    },
+    "metrics": {
+      "BasicMQ": {
+        "a": 0.3623,
+        "b": 0.3617,
+        "delta": -0.0005999999999999894
+      },
+      "InterConnectivity": {
+        "a": 0.0,
+        "b": 0.0,
+        "delta": 0.0
+      },
+      "IntraConnectivity": {
+        "a": 0.0001,
+        "b": 0.0001,
+        "delta": 0.0
+      },
+      "RCI": {
+        "a": 0.966,
+        "b": 0.9622,
+        "delta": -0.0037999999999999146
+      },
+      "TurboMQ": {
+        "a": 2.5364,
+        "b": 2.5318,
+        "delta": -0.0045999999999999375
+      },
+      "TwoWayPairRatio": {
+        "a": 0.6667,
+        "b": 0.6667,
+        "delta": 0.0
+      }
+    },
+    "languages": {
+      "a": [
+        "typescript"
+      ],
+      "b": [
+        "typescript"
+      ]
+    },
+    "summary": {
+      "components_a": 7,
+      "components_b": 7,
+      "shifts": 0,
+      "entities_a": 8178,
+      "entities_b": 7868,
+      "entities_added": 0,
+      "entities_deleted": 310,
+      "smells_new": 0,
+      "smells_resolved": 0
+    }
+  }
+}

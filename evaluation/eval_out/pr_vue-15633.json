@@ -1,0 +1,141 @@
+{
+  "repo": "vue",
+  "pr": 15633,
+  "title": "chore: migrate to Vitest 5 with Vite+",
+  "url": "https://github.com/vuejs/core/pull/15633",
+  "base": "a429b2a6fd43",
+  "head": "7dd8954e8cfa",
+  "base_stats": {
+    "entities": 2779,
+    "edges": 3504,
+    "components": 5,
+    "smells": 2
+  },
+  "head_stats": {
+    "entities": 2754,
+    "edges": 3459,
+    "components": 5,
+    "smells": 2
+  },
+  "changelog": {
+    "refs": {
+      "a": "PR#15633 base a429b2a6",
+      "b": "PR#15633 head 7dd8954e"
+    },
+    "components": {
+      "added": [],
+      "removed": [],
+      "renamed": [],
+      "split": [],
+      "merged": [],
+      "rewritten": [],
+      "stable": [
+        "Packages",
+        "Packages-Private",
+        "Rolldown",
+        "Scripts",
+        "Vite"
+      ]
+    },
+    "responsibility_shifts": [
+      {
+        "entity": "packages.reactivity.__benchmarks__.computed.bench",
+        "from": "Packages",
+        "to": "Scripts"
+      },
+      {
+        "entity": "packages.reactivity.__benchmarks__.effect.bench",
+        "from": "Packages",
+        "to": "Scripts"
+      },
+      {
+        "entity": "packages.reactivity.__benchmarks__.reactiveArray.bench",
+        "from": "Packages",
+        "to": "Scripts"
+      },
+      {
+        "entity": "packages.reactivity.__benchmarks__.reactiveObject.bench",
+        "from": "Packages",
+        "to": "Scripts"
+      },
+      {
+        "entity": "packages.reactivity.__benchmarks__.ref.bench",
+        "from": "Packages",
+        "to": "Scripts"
+      }
+    ],
+    "smells": {
+      "new": [],
+      "resolved": [],
+      "persisting": [
+        {
+          "smell_type": "Concern Overload",
+          "severity": "high",
+          "affected_components": [
+            "Packages-Private"
+          ],
+          "description": "Packages-Private contains 85 entities but only 1 internal dependencies (0.01 per entity), suggesting multiple responsibilities."
+        },
+        {
+          "smell_type": "Concern Overload",
+          "severity": "high",
+          "affected_components": [
+            "Scripts"
+          ],
+          "description": "Scripts contains 61 entities but only 7 internal dependencies (0.11 per entity), suggesting multiple responsibilities."
+        }
+      ]
+    },
+    "metrics": {
+      "BasicMQ": {
+        "a": 0.6,
+        "b": 0.5646,
+        "delta": -0.03539999999999999
+      },
+      "InterConnectivity": {
+        "a": 0.0,
+        "b": 0.0,
+        "delta": 0.0
+      },
+      "IntraConnectivity": {
+        "a": 0.0003,
+        "b": 0.0005,
+        "delta": 0.00020000000000000004
+      },
+      "RCI": {
+        "a": 1.0,
+        "b": 0.9991,
+        "delta": -0.0009000000000000119
+      },
+      "TurboMQ": {
+        "a": 3.0,
+        "b": 2.8231,
+        "delta": -0.17689999999999984
+      },
+      "TwoWayPairRatio": {
+        "a": 0.0,
+        "b": 0.0,
+        "delta": 0.0
+      }
+    },
+    "languages": {
+      "a": [
+        "typescript"
+      ],
+      "b": [
+        "typescript"
+      ]
+    },
+    "summary": {
+      "components_a": 5,
+      "components_b": 5,
+      "shifts": 5,
+      "entities_a": 2779,
+      "entities_b": 2754,
+      "entities_added": 35,
+      "entities_deleted": 60,
+      "smells_new": 0,
+      "smells_resolved": 0
+    }
+  }
+}

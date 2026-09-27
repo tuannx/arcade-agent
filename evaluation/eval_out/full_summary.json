@@ -1,0 +1,672 @@
+{
+  "repos": {
+    "django": {
+      "num_entities": 10881,
+      "num_edges": 8901,
+      "num_components": 21,
+      "algorithm": "pkg",
+      "largest_components": [
+        3451,
+        2832,
+        1422,
+        1316,
+        511,
+        427,
+        199,
+        196,
+        94,
+        90
+      ],
+      "num_smells": 18,
+      "smells_by_type": {
+        "Dependency Cycle": 1,
+        "Concern Overload": 10,
+        "Scattered Parasitic Functionality": 3,
+        "Link/Upstream Overload": 4
+      },
+      "metrics": {
+        "RCI": 0.6605,
+        "TurboMQ": 9.9205,
+        "BasicMQ": 0.4724,
+        "IntraConnectivity": 0.0045,
+        "InterConnectivity": 0.0003,
+        "TwoWayPairRatio": 0.3333
+      },
+      "analysis_seconds": 0.7,
+      "homepage": "https://www.djangoproject.com/"
+    },
+    "react": {
+      "num_entities": 7861,
+      "num_edges": 4221,
+      "num_components": 7,
+      "algorithm": "pkg",
+      "largest_components": [
+        5070,
+        1666,
+        697,
+        402,
+        20,
+        3,
+        3
+      ],
+      "num_smells": 7,
+      "smells_by_type": {
+        "Dependency Cycle": 1,
+        "Concern Overload": 2,
+        "Scattered Parasitic Functionality": 4
+      },
+      "metrics": {
+        "RCI": 0.9647,
+        "TurboMQ": 2.5428,
+        "BasicMQ": 0.3633,
+        "IntraConnectivity": 0.0001,
+        "InterConnectivity": 0.0,
+        "TwoWayPairRatio": 0.6667
+      },
+      "analysis_seconds": 7.8,
+      "homepage": "https://react.dev/"
+    },
+    "vue": {
+      "num_entities": 1630,
+      "num_edges": 1730,
+      "num_components": 6,
+      "algorithm": "pkg",
+      "largest_components": [
+        1526,
+        48,
+        48,
+        6,
+        1,
+        1
+      ],
+      "num_smells": 2,
+      "smells_by_type": {
+        "Concern Overload": 2
+      },
+      "metrics": {
+        "RCI": 1.0,
+        "TurboMQ": 1.0,
+        "BasicMQ": 0.1667,
+        "IntraConnectivity": 0.0001,
+        "InterConnectivity": 0.0,
+        "TwoWayPairRatio": 0.0
+      },
+      "analysis_seconds": 1.1,
+      "homepage": "https://vuejs.org/"
+    }
+  },
+  "prs": {
+    "react-37187": {
+      "repo": "react",
+      "pr": 37187,
+      "title": "[DevTools] Remove the dead Timeline profiler code",
+      "url": "https://github.com/facebook/react/pull/37187",
+      "base": "44fe7e953a05",
+      "head": "c89931b2c4e0",
+      "base_stats": {
+        "entities": 8178,
+        "edges": 4674,
+        "components": 7,
+        "smells": 7
+      },
+      "head_stats": {
+        "entities": 7868,
+        "edges": 4203,
+        "components": 7,
+        "smells": 7
+      },
+      "changelog": {
+        "refs": {
+          "a": "PR#37187 base 44fe7e95",
+          "b": "PR#37187 head c89931b2"
+        },
+        "components": {
+          "added": [],
+          "removed": [],
+          "renamed": [],
+          "split": [],
+          "merged": [],
+          "rewritten": [],
+          "stable": [
+            "Babel",
+            "Compiler",
+            "Default",
+            "Fixtures",
+            "Flow-Typed",
+            "Packages",
+            "Scripts"
+          ]
+        },
+        "responsibility_shifts": [],
+        "smells": {
+          "new": [],
+          "resolved": [],
+          "persisting": [
+            {
+              "smell_type": "Concern Overload",
+              "severity": "high",
+              "affected_components": [
+                "Fixtures"
+              ],
+              "description": "Fixtures contains 701 entities but only 42 internal dependencies (0.06 per entity), suggesting multiple responsibilities."
+            },
+            {
+              "smell_type": "Concern Overload",
+              "severity": "high",
+              "affected_components": [
+                "Scripts"
+              ],
+              "description": "Scripts contains 375 entities but only 0 internal dependencies (0.00 per entity), suggesting multiple responsibilities."
+            },
+            {
+              "smell_type": "Dependency Cycle",
+              "severity": "medium",
+              "affected_components": [
+                "Compiler",
+                "Fixtures",
+                "Packages"
+              ],
+              "description": "Circular dependency among 3 components: Compiler <-> Fixtures <-> Packages"
+            },
+            {
+              "smell_type": "Scattered Parasitic Functionality",
+              "severity": "medium",
+              "affected_components": [
+                "Compiler",
+                "Fixtures",
+                "Packages"
+              ],
+              "description": "'Provider' pattern is scattered across 3 components: Compiler, Fixtures, Packages"
+            },
+            {
+              "smell_type": "Scattered Parasitic Functionality",
+              "severity": "medium",
+              "affected_components": [
+                "Compiler",
+                "Packages",
+                "Scripts"
+              ],
+              "description": "'Helper' pattern is scattered across 3 components: Compiler, Packages, Scripts"
+            }
+          ]
+        },
+        "metrics": {
+          "BasicMQ": {
+            "a": 0.3623,
+            "b": 0.3617,
+            "delta": -0.0005999999999999894
+          },
+          "InterConnectivity": {
+            "a": 0.0,
+            "b": 0.0,
+            "delta": 0.0
+          },
+          "IntraConnectivity": {
+            "a": 0.0001,
+            "b": 0.0001,
+            "delta": 0.0
+          },
+          "RCI": {
+            "a": 0.966,
+            "b": 0.9622,
+            "delta": -0.0037999999999999146
+          },
+          "TurboMQ": {
+            "a": 2.5364,
+            "b": 2.5318,
+            "delta": -0.0045999999999999375
+          },
+          "TwoWayPairRatio": {
+            "a": 0.6667,
+            "b": 0.6667,
+            "delta": 0.0
+          }
+        },
+        "languages": {
+          "a": [
+            "typescript"
+          ],
+          "b": [
+            "typescript"
+          ]
+        },
+        "summary": {
+          "components_a": 7,
+          "components_b": 7,
+          "shifts": 0,
+          "entities_a": 8178,
+          "entities_b": 7868,
+          "entities_added": 0,
+          "entities_deleted": 310,
+          "smells_new": 0,
+          "smells_resolved": 0
+        }
+      }
+    },
+    "vue-15633": {
+      "repo": "vue",
+      "pr": 15633,
+      "title": "chore: migrate to Vitest 5 with Vite+",
+      "url": "https://github.com/vuejs/core/pull/15633",
+      "base": "a429b2a6fd43",
+      "head": "7dd8954e8cfa",
+      "base_stats": {
+        "entities": 2779,
+        "edges": 3504,
+        "components": 5,
+        "smells": 2
+      },
+      "head_stats": {
+        "entities": 2754,
+        "edges": 3459,
+        "components": 5,
+        "smells": 2
+      },
+      "changelog": {
+        "refs": {
+          "a": "PR#15633 base a429b2a6",
+          "b": "PR#15633 head 7dd8954e"
+        },
+        "components": {
+          "added": [],
+          "removed": [],
+          "renamed": [],
+          "split": [],
+          "merged": [],
+          "rewritten": [],
+          "stable": [
+            "Packages",
+            "Packages-Private",
+            "Rolldown",
+            "Scripts",
+            "Vite"
+          ]
+        },
+        "responsibility_shifts": [
+          {
+            "entity": "packages.reactivity.__benchmarks__.computed.bench",
+            "from": "Packages",
+            "to": "Scripts"
+          },
+          {
+            "entity": "packages.reactivity.__benchmarks__.effect.bench",
+            "from": "Packages",
+            "to": "Scripts"
+          },
+          {
+            "entity": "packages.reactivity.__benchmarks__.reactiveArray.bench",
+            "from": "Packages",
+            "to": "Scripts"
+          },
+          {
+            "entity": "packages.reactivity.__benchmarks__.reactiveObject.bench",
+            "from": "Packages",
+            "to": "Scripts"
+          },
+          {
+            "entity": "packages.reactivity.__benchmarks__.ref.bench",
+            "from": "Packages",
+            "to": "Scripts"
+          }
+        ],
+        "smells": {
+          "new": [],
+          "resolved": [],
+          "persisting": [
+            {
+              "smell_type": "Concern Overload",
+              "severity": "high",
+              "affected_components": [
+                "Packages-Private"
+              ],
+              "description": "Packages-Private contains 85 entities but only 1 internal dependencies (0.01 per entity), suggesting multiple responsibilities."
+            },
+            {
+              "smell_type": "Concern Overload",
+              "severity": "high",
+              "affected_components": [
+                "Scripts"
+              ],
+              "description": "Scripts contains 61 entities but only 7 internal dependencies (0.11 per entity), suggesting multiple responsibilities."
+            }
+          ]
+        },
+        "metrics": {
+          "BasicMQ": {
+            "a": 0.6,
+            "b": 0.5646,
+            "delta": -0.03539999999999999
+          },
+          "InterConnectivity": {
+            "a": 0.0,
+            "b": 0.0,
+            "delta": 0.0
+          },
+          "IntraConnectivity": {
+            "a": 0.0003,
+            "b": 0.0005,
+            "delta": 0.00020000000000000004
+          },
+          "RCI": {
+            "a": 1.0,
+            "b": 0.9991,
+            "delta": -0.0009000000000000119
+          },
+          "TurboMQ": {
+            "a": 3.0,
+            "b": 2.8231,
+            "delta": -0.17689999999999984
+          },
+          "TwoWayPairRatio": {
+            "a": 0.0,
+            "b": 0.0,
+            "delta": 0.0
+          }
+        },
+        "languages": {
+          "a": [
+            "typescript"
+          ],
+          "b": [
+            "typescript"
+          ]
+        },
+        "summary": {
+          "components_a": 5,
+          "components_b": 5,
+          "shifts": 5,
+          "entities_a": 2779,
+          "entities_b": 2754,
+          "entities_added": 35,
+          "entities_deleted": 60,
+          "smells_new": 0,
+          "smells_resolved": 0
+        }
+      }
+    },
+    "django-18036": {
+      "repo": "django",
+      "pr": 18036,
+      "title": "Fixed #35303 -- Added async auth backends and associated functionality",
+      "url": "https://github.com/django/django/pull/18036",
+      "base": "d876be794f59",
+      "head": "3ab611d7a1d9",
+      "base_stats": {
+        "entities": 10242,
+        "edges": 8141,
+        "components": 19,
+        "smells": 17
+      },
+      "head_stats": {
+        "entities": 10284,
+        "edges": 8155,
+        "components": 19,
+        "smells": 17
+      },
+      "changelog": {
+        "refs": {
+          "a": "PR#18036 base d876be79",
+          "b": "PR#18036 head 3ab611d7"
+        },
+        "components": {
+          "added": [],
+          "removed": [],
+          "renamed": [],
+          "split": [],
+          "merged": [],
+          "rewritten": [],
+          "stable": [
+            "Apps",
+            "Conf",
+            "Contrib",
+            "Core",
+            "Db",
+            "Default",
+            "Dispatch",
+            "Django",
+            "Docs",
+            "Ext",
+            "Forms",
+            "Http",
+            "Middleware",
+            "Scripts",
+            "Template",
+            "Templatetags",
+            "Urls",
+            "Utils",
+            "Views"
+          ]
+        },
+        "responsibility_shifts": [
+          {
+            "entity": "django.contrib.auth.aauthenticate",
+            "from": "Views",
+            "to": "Contrib"
+          },
+          {
+            "entity": "django.contrib.auth.aget_user",
+            "from": "Contrib",
+            "to": "Utils"
+          }
+        ],
+        "smells": {
+          "new": [],
+          "resolved": [],
+          "persisting": [
+            {
+              "smell_type": "Concern Overload",
+              "severity": "high",
+              "affected_components": [
+                "Conf"
+              ],
+              "description": "Conf contains 93 entities but only 5 internal dependencies (0.05 per entity), suggesting multiple responsibilities."
+            },
+            {
+              "smell_type": "Concern Overload",
+              "severity": "medium",
+              "affected_components": [
+                "Django"
+              ],
+              "description": "Django contains 27 entities but only 2 internal dependencies (0.07 per entity), suggesting multiple responsibilities."
+            },
+            {
+              "smell_type": "Concern Overload",
+              "severity": "medium",
+              "affected_components": [
+                "Ext"
+              ],
+              "description": "Ext contains 40 entities but only 3 internal dependencies (0.07 per entity), suggesting multiple responsibilities."
+            },
+            {
+              "smell_type": "Concern Overload",
+              "severity": "high",
+              "affected_components": [
+                "Http"
+              ],
+              "description": "Http contains 198 entities but only 59 internal dependencies (0.30 per entity), suggesting multiple responsibilities."
+            },
+            {
+              "smell_type": "Concern Overload",
+              "severity": "high",
+              "affected_components": [
+                "Middleware"
+              ],
+              "description": "Middleware contains 44 entities but only 7 internal dependencies (0.16 per entity), suggesting multiple responsibilities."
+            },
+            {
+              "smell_type": "Concern Overload",
+              "severity": "high",
+              "affected_components": [
+                "Template"
+              ],
+              "description": "Template contains 410 entities but only 148 internal dependencies (0.36 per entity), suggesting multiple responsibilities."
+            },
+            {
+              "smell_type": "Concern Overload",
+              "severity": "high",
+              "affected_components": [
+                "Templatetags"
+              ],
+              "description": "Templatetags contains 43 entities but only 1 internal dependencies (0.02 per entity), suggesting multiple responsibilities."
+            },
+            {
+              "smell_type": "Concern Overload",
+              "severity": "high",
+              "affected_components": [
+                "Urls"
+              ],
+              "description": "Urls contains 80 entities but only 26 internal dependencies (0.33 per entity), suggesting multiple responsibilities."
+            },
+            {
+              "smell_type": "Concern Overload",
+              "severity": "high",
+              "affected_components": [
+                "Views"
+              ],
+              "description": "Views contains 188 entities but only 66 internal dependencies (0.35 per entity), suggesting multiple responsibilities."
+            },
+            {
+              "smell_type": "Dependency Cycle",
+              "severity": "high",
+              "affected_components": [
+                "Apps",
+                "Conf",
+                "Contrib",
+                "Core",
+                "Db",
+                "Dispatch",
+                "Django",
+                "Forms",
+                "Http",
+                "Middleware",
+                "Template",
+                "Templatetags",
+                "Urls",
+                "Utils",
+                "Views"
+              ],
+              "description": "Circular dependency among 15 components: Apps <-> Conf <-> Contrib <-> Core <-> Db <-> Dispatch <-> Django <-> Forms <-> Http <-> Middleware <-> Template <-> Templatetags <-> Urls <-> Utils <-> Views"
+            },
+            {
+              "smell_type": "Link/Upstream Overload",
+              "severity": "medium",
+              "affected_components": [
+                "Contrib"
+              ],
+              "description": "Contrib is depended on by 10 other components (56% of all components)."
+            },
+            {
+              "smell_type": "Link/Upstream Overload",
+              "severity": "high",
+              "affected_components": [
+                "Core"
+              ],
+              "description": "Core is depended on by 14 other components (78% of all components)."
+            },
+            {
+              "smell_type": "Link/Upstream Overload",
+              "severity": "medium",
+              "affected_components": [
+                "Db"
+              ],
+              "description": "Db is depended on by 10 other components (56% of all components)."
+            },
+            {
+              "smell_type": "Link/Upstream Overload",
+              "severity": "high",
+              "affected_components": [
+                "Utils"
+              ],
+              "description": "Utils is depended on by 15 other components (83% of all components)."
+            },
+            {
+              "smell_type": "Scattered Parasitic Functionality",
+              "severity": "medium",
+              "affected_components": [
+                "Apps",
+                "Contrib",
+                "Db"
+              ],
+              "description": "'Config' pattern is scattered across 3 components: Apps, Contrib, Db"
+            },
+            {
+              "smell_type": "Scattered Parasitic Functionality",
+              "severity": "high",
+              "affected_components": [
+                "Contrib",
+                "Core",
+                "Db",
+                "Template",
+                "Utils"
+              ],
+              "description": "'Handler' pattern is scattered across 5 components: Contrib, Core, Db, Template, Utils"
+            },
+            {
+              "smell_type": "Scattered Parasitic Functionality",
+              "severity": "high",
+              "affected_components": [
+                "Contrib",
+                "Core",
+                "Http",
+                "Template",
+                "Utils"
+              ],
+              "description": "'Exception' pattern is scattered across 5 components: Contrib, Core, Http, Template, Utils"
+            }
+          ]
+        },
+        "metrics": {
+          "BasicMQ": {
+            "a": 0.3936,
+            "b": 0.3933,
+            "delta": -0.00030000000000002247
+          },
+          "InterConnectivity": {
+            "a": 0.0002,
+            "b": 0.0002,
+            "delta": 0.0
+          },
+          "IntraConnectivity": {
+            "a": 0.0028,
+            "b": 0.0028,
+            "delta": 0.0
+          },
+          "RCI": {
+            "a": 0.6599,
+            "b": 0.6598,
+            "delta": -9.999999999998899e-05
+          },
+          "TurboMQ": {
+            "a": 7.4789,
+            "b": 7.4726,
+            "delta": -0.006300000000000416
+          },
+          "TwoWayPairRatio": {
+            "a": 0.3056,
+            "b": 0.3056,
+            "delta": 0.0
+          }
+        },
+        "languages": {
+          "a": [
+            "python"
+          ],
+          "b": [
+            "python"
+          ]
+        },
+        "summary": {
+          "components_a": 19,
+          "components_b": 19,
+          "shifts": 2,
+          "entities_a": 10242,
+          "entities_b": 10284,
+          "entities_added": 43,
+          "entities_deleted": 1,
+          "smells_new": 0,
+          "smells_resolved": 0
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,284 @@
+{
+  "repo": "django",
+  "pr": 18036,
+  "title": "Fixed #35303 -- Added async auth backends and associated functionality",
+  "url": "https://github.com/django/django/pull/18036",
+  "base": "d876be794f59",
+  "head": "3ab611d7a1d9",
+  "base_stats": {
+    "entities": 10242,
+    "edges": 8141,
+    "components": 19,
+    "smells": 17
+  },
+  "head_stats": {
+    "entities": 10284,
+    "edges": 8155,
+    "components": 19,
+    "smells": 17
+  },
+  "changelog": {
+    "refs": {
+      "a": "PR#18036 base d876be79",
+      "b": "PR#18036 head 3ab611d7"
+    },
+    "components": {
+      "added": [],
+      "removed": [],
+      "renamed": [],
+      "split": [],
+      "merged": [],
+      "rewritten": [],
+      "stable": [
+        "Apps",
+        "Conf",
+        "Contrib",
+        "Core",
+        "Db",
+        "Default",
+        "Dispatch",
+        "Django",
+        "Docs",
+        "Ext",
+        "Forms",
+        "Http",
+        "Middleware",
+        "Scripts",
+        "Template",
+        "Templatetags",
+        "Urls",
+        "Utils",
+        "Views"
+      ]
+    },
+    "responsibility_shifts": [
+      {
+        "entity": "django.contrib.auth.aauthenticate",
+        "from": "Views",
+        "to": "Contrib"
+      },
+      {
+        "entity": "django.contrib.auth.aget_user",
+        "from": "Contrib",
+        "to": "Utils"
+      }
+    ],
+    "smells": {
+      "new": [],
+      "resolved": [],
+      "persisting": [
+        {
+          "smell_type": "Concern Overload",
+          "severity": "high",
+          "affected_components": [
+            "Conf"
+          ],
+          "description": "Conf contains 93 entities but only 5 internal dependencies (0.05 per entity), suggesting multiple responsibilities."
+        },
+        {
+          "smell_type": "Concern Overload",
+          "severity": "medium",
+          "affected_components": [
+            "Django"
+          ],
+          "description": "Django contains 27 entities but only 2 internal dependencies (0.07 per entity), suggesting multiple responsibilities."
+        },
+        {
+          "smell_type": "Concern Overload",
+          "severity": "medium",
+          "affected_components": [
+            "Ext"
+          ],
+          "description": "Ext contains 40 entities but only 3 internal dependencies (0.07 per entity), suggesting multiple responsibilities."
+        },
+        {
+          "smell_type": "Concern Overload",
+          "severity": "high",
+          "affected_components": [
+            "Http"
+          ],
+          "description": "Http contains 198 entities but only 59 internal dependencies (0.30 per entity), suggesting multiple responsibilities."
+        },
+        {
+          "smell_type": "Concern Overload",
+          "severity": "high",
+          "affected_components": [
+            "Middleware"
+          ],
+          "description": "Middleware contains 44 entities but only 7 internal dependencies (0.16 per entity), suggesting multiple responsibilities."
+        },
+        {
+          "smell_type": "Concern Overload",
+          "severity": "high",
+          "affected_components": [
+            "Template"
+          ],
+          "description": "Template contains 410 entities but only 148 internal dependencies (0.36 per entity), suggesting multiple responsibilities."
+        },
+        {
+          "smell_type": "Concern Overload",
+          "severity": "high",
+          "affected_components": [
+            "Templatetags"
+          ],
+          "description": "Templatetags contains 43 entities but only 1 internal dependencies (0.02 per entity), suggesting multiple responsibilities."
+        },
+        {
+          "smell_type": "Concern Overload",
+          "severity": "high",
+          "affected_components": [
+            "Urls"
+          ],
+          "description": "Urls contains 80 entities but only 26 internal dependencies (0.33 per entity), suggesting multiple responsibilities."
+        },
+        {
+          "smell_type": "Concern Overload",
+          "severity": "high",
+          "affected_components": [
+            "Views"
+          ],
+          "description": "Views contains 188 entities but only 66 internal dependencies (0.35 per entity), suggesting multiple responsibilities."
+        },
+        {
+          "smell_type": "Dependency Cycle",
+          "severity": "high",
+          "affected_components": [
+            "Apps",
+            "Conf",
+            "Contrib",
+            "Core",
+            "Db",
+            "Dispatch",
+            "Django",
+            "Forms",
+            "Http",
+            "Middleware",
+            "Template",
+            "Templatetags",
+            "Urls",
+            "Utils",
+            "Views"
+          ],
+          "description": "Circular dependency among 15 components: Apps <-> Conf <-> Contrib <-> Core <-> Db <-> Dispatch <-> Django <-> Forms <-> Http <-> Middleware <-> Template <-> Templatetags <-> Urls <-> Utils <-> Views"
+        },
+        {
+          "smell_type": "Link/Upstream Overload",
+          "severity": "medium",
+          "affected_components": [
+            "Contrib"
+          ],
+          "description": "Contrib is depended on by 10 other components (56% of all components)."
+        },
+        {
+          "smell_type": "Link/Upstream Overload",
+          "severity": "high",
+          "affected_components": [
+            "Core"
+          ],
+          "description": "Core is depended on by 14 other components (78% of all components)."
+        },
+        {
+          "smell_type": "Link/Upstream Overload",
+          "severity": "medium",
+          "affected_components": [
+            "Db"
+          ],
+          "description": "Db is depended on by 10 other components (56% of all components)."
+        },
+        {
+          "smell_type": "Link/Upstream Overload",
+          "severity": "high",
+          "affected_components": [
+            "Utils"
+          ],
+          "description": "Utils is depended on by 15 other components (83% of all components)."
+        },
+        {
+          "smell_type": "Scattered Parasitic Functionality",
+          "severity": "medium",
+          "affected_components": [
+            "Apps",
+            "Contrib",
+            "Db"
+          ],
+          "description": "'Config' pattern is scattered across 3 components: Apps, Contrib, Db"
+        },
+        {
+          "smell_type": "Scattered Parasitic Functionality",
+          "severity": "high",
+          "affected_components": [
+            "Contrib",
+            "Core",
+            "Db",
+            "Template",
+            "Utils"
+          ],
+          "description": "'Handler' pattern is scattered across 5 components: Contrib, Core, Db, Template, Utils"
+        },
+        {
+          "smell_type": "Scattered Parasitic Functionality",
+          "severity": "high",
+          "affected_components": [
+            "Contrib",
+            "Core",
+            "Http",
+            "Template",
+            "Utils"
+          ],
+          "description": "'Exception' pattern is scattered across 5 components: Contrib, Core, Http, Template, Utils"
+        }
+      ]
+    },
+    "metrics": {
+      "BasicMQ": {
+        "a": 0.3936,
+        "b": 0.3933,
+        "delta": -0.00030000000000002247
+      },
+      "InterConnectivity": {
+        "a": 0.0002,
+        "b": 0.0002,
+        "delta": 0.0
+      },
+      "IntraConnectivity": {
+        "a": 0.0028,
+        "b": 0.0028,
+        "delta": 0.0
+      },
+      "RCI": {
+        "a": 0.6599,
+        "b": 0.6598,
+        "delta": -9.999999999998899e-05
+      },
+      "TurboMQ": {
+        "a": 7.4789,
+        "b": 7.4726,
+        "delta": -0.006300000000000416
+      },
+      "TwoWayPairRatio": {
+        "a": 0.3056,
+        "b": 0.3056,
+        "delta": 0.0
+      }
+    },
+    "languages": {
+      "a": [
+        "python"
+      ],
+      "b": [
+        "python"
+      ]
+    },
+    "summary": {
+      "components_a": 19,
+      "components_b": 19,
+      "shifts": 2,
+      "entities_a": 10242,
+      "entities_b": 10284,
+      "entities_added": 43,
+      "entities_deleted": 1,
+      "smells_new": 0,
+      "smells_resolved": 0
+    }
+  }
+}
