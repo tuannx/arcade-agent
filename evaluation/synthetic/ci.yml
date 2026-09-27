@@ -1,0 +1,55 @@
+# Regenerate the arch-demo reports and publish them to GitHub Pages.
+#
+# Drop this file into .github/workflows/ of the repo that hosts the gh-pages
+# branch. It mirrors the mvn-perf pattern: one CI run per scenario matrix,
+# one self-contained HTML report per scenario, published to Pages.
+#
+# The gh-pages branch here IS the published site (orphan branch), so the job
+# regenerates the reports and commits them back to the same branch.
+
+name: arch-demo synthetic reports
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'evaluation/synthetic/**'
+      - '.github/workflows/synthetic-reports.yml'
+  workflow_dispatch:
+
+jobs:
+  reports:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install arcade-agent
+        run: pip install "arcade-agent[languages]"
+
+      - name: Run synthetic demo
+        run: |
+          cd evaluation/synthetic
+          python run_synthetic.py
+
+      - name: Publish reports to site
+        run: |
+          # run_synthetic.py writes the HTML reports next to itself.
+          cp evaluation/synthetic/synthetic_before.html reports/synthetic_before.html
+          cp evaluation/synthetic/synthetic_after.html reports/synthetic_after.html
+
+      - name: Commit regenerated reports
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add reports/synthetic_before.html reports/synthetic_after.html \
+                  evaluation/synthetic/synthetic_before.html \
+                  evaluation/synthetic/synthetic_after.html \
+                  evaluation/synthetic/synthetic_summary.json
+          git diff --cached --quiet || git commit -m "regen arch-demo synthetic reports"
+          git push

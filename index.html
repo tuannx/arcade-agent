@@ -35,6 +35,7 @@ nav.top a{margin-right:18px;text-decoration:none;color:var(--mut)}nav.top a:hove
 <a href="./index.html"><b style="color:#e6edf3">arcade-agent</b> · evaluation</a>
 <a href="./index.html#scale">Scale benchmark</a>
 <a href="./index.html#prs">PR case studies</a>
+<a href="./synthetic.html">Synthetic demo</a>
 <a href="./index.html#method">Methodology</a>
 <a href="https://github.com/arcade-agent/arcade-agent">GitHub</a>
 </div></nav><div class="wrap">
@@ -87,6 +88,19 @@ to comment on PRs. Click through for the full architectural changelog.</p>
 <div><div class="v">17 → 17 <span class="delta-flat">(+0)</span></div><div class="k">smells</div></div>
 </div>
 <div class="meta"><a href="https://github.com/django/django/pull/18036">View PR on GitHub ↗</a></div></div>
+
+<h2 id="synthetic">Deterministic lab: arch-demo</h2>
+<p>Real repos are noisy. We also built a tiny synthetic shop with two smells <em>planted on purpose</em> —
+a Billing ↔ Notifications dependency cycle and a utils god module — then refactored both away.
+Same pipeline, same <code>changelog_architecture</code>. Result: <b>2 smells → 0</b>, in 0.2 s, byte-reproducible.</p>
+<div class="card"><h3><a href="./synthetic.html">arch-demo: planted smells → refactor → proof</a></h3>
+<div class="meta">Deterministic before/after with full HTML reports for both revisions and the architectural changelog between them.</div>
+<div class="kv">
+<div><div class="v">39 → 20</div><div class="k">entities</div></div>
+<div><div class="v delta-up">2 → 0</div><div class="k">smells</div></div>
+<div><div class="v">0.2s</div><div class="k">analysis time</div></div>
+</div>
+<div class="meta"><a href="./reports/synthetic_before.html">Before report</a> · <a href="./reports/synthetic_after.html">After report</a></div></div>
 
 <h2 id="method">Methodology &amp; reproducibility</h2>
 <ul class="tight">

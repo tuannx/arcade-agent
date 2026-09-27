@@ -1,0 +1,145 @@
+{
+  "demo": "synthetic deterministic arch-demo",
+  "before_stats": {
+    "entities": 39,
+    "edges": 24,
+    "components": 5,
+    "smells": 2
+  },
+  "after_stats": {
+    "entities": 20,
+    "edges": 22,
+    "components": 5,
+    "smells": 0
+  },
+  "changelog": {
+    "refs": {
+      "a": "before (planted smells)",
+      "b": "after (refactored)"
+    },
+    "components": {
+      "added": [],
+      "removed": [],
+      "renamed": [],
+      "split": [
+        {
+          "from": "Notifications",
+          "into": [
+            "Billing",
+            "Notifications"
+          ],
+          "entities": {
+            "Billing": 1,
+            "Notifications": 2
+          }
+        }
+      ],
+      "merged": [
+        {
+          "into": "Billing",
+          "from": [
+            "Billing",
+            "Notifications"
+          ],
+          "entities": {
+            "Billing": 5,
+            "Notifications": 1
+          }
+        }
+      ],
+      "rewritten": [
+        {
+          "name": "Utils",
+          "before": 23,
+          "after": 4,
+          "retained": 0
+        }
+      ],
+      "stable": [
+        "Auth",
+        "Orders"
+      ]
+    },
+    "responsibility_shifts": [
+      {
+        "entity": "shop.billing.invoice.Invoice.issue",
+        "from": "Notifications",
+        "to": "Billing"
+      }
+    ],
+    "smells": {
+      "new": [],
+      "resolved": [
+        {
+          "smell_type": "Concern Overload",
+          "severity": "medium",
+          "affected_components": [
+            "Utils"
+          ],
+          "description": "Utils contains 23 entities but only 0 internal dependencies (0.00 per entity), suggesting multiple responsibilities."
+        },
+        {
+          "smell_type": "Dependency Cycle",
+          "severity": "low",
+          "affected_components": [
+            "Billing",
+            "Notifications"
+          ],
+          "description": "Circular dependency among 2 components: Billing <-> Notifications"
+        }
+      ],
+      "persisting": []
+    },
+    "metrics": {
+      "BasicMQ": {
+        "a": 0.2783,
+        "b": 0.3433,
+        "delta": 0.065
+      },
+      "InterConnectivity": {
+        "a": 0.1185,
+        "b": 0.2524,
+        "delta": 0.13390000000000002
+      },
+      "IntraConnectivity": {
+        "a": 0.14,
+        "b": 0.1524,
+        "delta": 0.012399999999999994
+      },
+      "RCI": {
+        "a": 0.2917,
+        "b": 0.3636,
+        "delta": 0.07189999999999996
+      },
+      "TurboMQ": {
+        "a": 1.3914,
+        "b": 1.7167,
+        "delta": 0.3252999999999999
+      },
+      "TwoWayPairRatio": {
+        "a": 0.1667,
+        "b": 0.0,
+        "delta": -0.1667
+      }
+    },
+    "languages": {
+      "a": [
+        "python"
+      ],
+      "b": [
+        "python"
+      ]
+    },
+    "summary": {
+      "components_a": 5,
+      "components_b": 5,
+      "shifts": 1,
+      "entities_a": 39,
+      "entities_b": 20,
+      "entities_added": 6,
+      "entities_deleted": 25,
+      "smells_new": 0,
+      "smells_resolved": 2
+    }
+  }
+}
