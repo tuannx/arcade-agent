@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>arcade-agent: jaeger head (ADR-011 #8800) (head)</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6; color: #1a1a2e; background: #f8f9fa;
+            max-width: 1200px; margin: 0 auto; padding: 2rem; padding-top: 4rem;
+        }
+        nav {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+            background: #1e293b; padding: 0.6rem 2rem;
+            display: flex; align-items: center; gap: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        nav .nav-title {
+            font-weight: 700; color: #f8fafc; font-size: 0.85rem;
+            white-space: nowrap; margin-right: 0.5rem;
+        }
+        nav a {
+            color: #94a3b8; text-decoration: none; font-size: 0.8rem;
+            padding: 0.3rem 0.7rem; border-radius: 4px; transition: all 0.15s;
+            white-space: nowrap;
+        }
+        nav a:hover { color: #f8fafc; background: #334155; }
+        h1 { font-size: 1.8rem; margin-bottom: 0.25rem; }
+        h2 { font-size: 1.3rem; margin: 2rem 0 1rem; border-bottom: 2px solid #e0e0e0; padding-bottom: 0.5rem; scroll-margin-top: 3.5rem; }
+        h3 { font-size: 1.1rem; margin: 1rem 0 0.5rem; }
+        .subtitle { color: #666; margin-bottom: 2rem; }
+        .stats {
+            display: flex; gap: 1.5rem; margin-bottom: 2rem; flex-wrap: wrap;
+        }
+        .stat-card {
+            background: white; border-radius: 8px; padding: 1rem 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1); min-width: 140px;
+        }
+        .stat-card .number { font-size: 1.8rem; font-weight: 700; color: #2563eb; }
+        .stat-card .label { font-size: 0.85rem; color: #666; }
+        .card {
+            background: white; border-radius: 8px; padding: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 1rem;
+        }
+        .mermaid { text-align: center; margin: 1rem 0; }
+        table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+        th, td { text-align: left; padding: 0.75rem; border-bottom: 1px solid #e0e0e0; }
+        th { background: #f1f5f9; font-weight: 600; font-size: 0.85rem; text-transform: uppercase; }
+        td { font-size: 0.9rem; }
+        .entity-list { font-family: monospace; font-size: 0.8rem; color: #555; max-width: 500px; }
+        .smell {
+            border-left: 4px solid #ccc; padding: 1rem 1.5rem; margin-bottom: 1rem;
+            background: white; border-radius: 0 8px 8px 0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .smell.high { border-left-color: #ef4444; }
+        .smell.medium { border-left-color: #f59e0b; }
+        .smell.low { border-left-color: #3b82f6; }
+        .smell-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; }
+        .badge {
+            font-size: 0.7rem; font-weight: 600; padding: 0.2rem 0.6rem;
+            border-radius: 99px; text-transform: uppercase;
+        }
+        .badge.high { background: #fef2f2; color: #dc2626; }
+        .badge.medium { background: #fffbeb; color: #d97706; }
+        .badge.low { background: #eff6ff; color: #2563eb; }
+        .smell-detail { margin: 0.5rem 0; font-size: 0.9rem; }
+        .smell-detail strong { display: inline-block; width: 100px; color: #555; }
+        .rationale { background: #f8fafc; padding: 1rem; border-radius: 6px; font-style: italic; color: #555; }
+        .metric-card {
+            display: inline-block; background: white; border-radius: 8px; padding: 1rem 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin: 0.5rem; min-width: 160px;
+        }
+        .metric-card .value { font-size: 1.4rem; font-weight: 700; color: #059669; }
+        .metric-card .name { font-size: 0.8rem; color: #666; }
+        .concern-tag {
+            display: inline-block; background: #e0e7ff; color: #3730a3;
+            font-size: 0.75rem; padding: 0.2rem 0.6rem; border-radius: 99px;
+            margin: 0.15rem; font-weight: 500;
+        }
+        footer { margin-top: 3rem; text-align: center; color: #999; font-size: 0.8rem; }
+    </style>
+</head>
+<body>
+    <nav>
+        <span class="nav-title">arcade-agent</span>
+        <a href="#overview">Overview</a>
+        
+        <a href="#diagram">Diagram</a>
+        <a href="#components">Components</a>
+        <a href="#smells">Smells (3)</a>
+        <a href="#dependencies">Dependencies</a>
+    </nav>
+
+    <h1 id="overview">Architecture Report</h1>
+    <p class="subtitle">jaeger head (ADR-011 #8800) &mdash; version head &mdash; recovered with pkg</p>
+
+    <div class="stats">
+        <div class="stat-card">
+            <div class="number">5904</div>
+            <div class="label">Entities</div>
+        </div>
+        <div class="stat-card">
+            <div class="number">9281</div>
+            <div class="label">Dependencies</div>
+        </div>
+        <div class="stat-card">
+            <div class="number">5</div>
+            <div class="label">Components</div>
+        </div>
+        <div class="stat-card">
+            <div class="number">3</div>
+            <div class="label">Smells</div>
+        </div>
+    </div>
+
+    
+
+    <h2 id="diagram">Architecture Diagram</h2>
+    <div class="card">
+        <pre class="mermaid">
+graph TD
+    Cmd["Cmd\n(664 entities)"]
+    Examples["Examples\n(200 entities)"]
+    Internal["Internal\n(5023 entities)"]
+    Monitoring["Monitoring\n(16 entities)"]
+    Ports["Ports\n(1 entities)"]
+    Cmd --> Internal
+    Cmd --> Ports
+    Examples --> Internal
+    Internal --> Cmd
+    Internal --> Examples
+    Internal --> Ports
+        </pre>
+    </div>
+
+    
+    <div class="rationale">Package-based grouping (depth=1 after common prefix '') with dependency-affinity facade refinement (23 entities reassigned).</div>
+    
+
+    <h2 id="components">Components</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Component</th>
+                <th>Responsibility</th>
+                <th>#</th>
+                
+                <th>Entities</th>
+            </tr>
+        </thead>
+        <tbody>
+        
+            <tr>
+                <td><strong>Cmd</strong></td>
+                <td>Entities in cmd</td>
+                <td>664</td>
+                
+                <td class="entity-list">cmd.anonymizer.app.Options, cmd.anonymizer.app.Options.AddFlags, cmd.anonymizer.app.anonymizer.Anonymizer, cmd.anonymizer.app.anonymizer.Anonymizer.AnonymizeSpan, cmd.anonymizer.app.anonymizer.Anonymizer.SaveMapping, cmd.anonymizer.app.anonymizer.Anonymizer.Stop, cmd.anonymizer.app.anonymizer.Anonymizer.mapOperationName, cmd.anonymizer.app.anonymizer.Anonymizer.mapServiceName, ... (+656 more)</td>
+            </tr>
+        
+            <tr>
+                <td><strong>Examples</strong></td>
+                <td>Entities in examples</td>
+                <td>200</td>
+                
+                <td class="entity-list">examples.hotrod.cmd.Execute, examples.hotrod.cmd.addFlags, examples.hotrod.cmd.init, examples.hotrod.cmd.logError, examples.hotrod.main, examples.hotrod.pkg.delay.Sleep, examples.hotrod.pkg.httperr.HandleError, examples.hotrod.pkg.httperr.StatusError, ... (+192 more)</td>
+            </tr>
+        
+            <tr>
+                <td><strong>Internal</strong></td>
+                <td>Entities in internal</td>
+                <td>5023</td>
+                
+                <td class="entity-list">cmd.anonymizer.app.uiconv.extractor.Run, cmd.anonymizer.app.uiconv.spanReader.NextSpan, cmd.es-index-cleaner.app.IndexFilter.Filter, cmd.es-index-cleaner.app.IndexFilter.filterByPattern, cmd.esmapping-generator.main, cmd.internal.flags.AdminServer.serveWithListener, cmd.jaeger.internal.extension.jaegermcp.internal.handlers.getCriticalPathHandler.buildOutput, cmd.jaeger.internal.extension.jaegermcp.internal.handlers.getSpanNamesHandler.handle, ... (+5015 more)</td>
+            </tr>
+        
+            <tr>
+                <td><strong>Monitoring</strong></td>
+                <td>Entities in monitoring</td>
+                <td>16</td>
+                
+                <td class="entity-list">monitoring.jaeger-mixin.generate.buildDashboard, monitoring.jaeger-mixin.generate.cpuUsagePanel, monitoring.jaeger-mixin.generate.datasourceRef, monitoring.jaeger-mixin.generate.exportSuccessRatePanel, monitoring.jaeger-mixin.generate.main, monitoring.jaeger-mixin.generate.memoryRSSPanel, monitoring.jaeger-mixin.generate.promTarget, monitoring.jaeger-mixin.generate.queryLatencyP99Panel, ... (+8 more)</td>
+            </tr>
+        
+            <tr>
+                <td><strong>Ports</strong></td>
+                <td>Entities in ports</td>
+                <td>1</td>
+                
+                <td class="entity-list">ports.PortToHostPort</td>
+            </tr>
+        
+        </tbody>
+    </table>
+
+    <h2 id="smells">Architectural Smells (3)</h2>
+    
+    
+    <div class="smell medium">
+        <div class="smell-header">
+            <span class="badge medium">medium</span>
+            <strong>SmellType.DEPENDENCY_CYCLE</strong>
+        </div>
+        <p class="smell-detail">Circular dependency among 3 components: Cmd <-> Examples <-> Internal</p>
+        <p class="smell-detail"><strong>Why:</strong> Dependency cycles make components tightly coupled — you cannot change, test, or deploy any component in the cycle independently. This hinders maintainability, increases build times, and makes the system harder to understand.</p>
+        <p class="smell-detail"><strong>Fix:</strong> Break the cycle by introducing an interface/abstraction that one component depends on, inverting the dependency direction. Consider the Dependency Inversion Principle (DIP).</p>
+        <p class="smell-detail"><strong>Affects:</strong> Cmd, Examples, Internal</p>
+    </div>
+    
+    <div class="smell medium">
+        <div class="smell-header">
+            <span class="badge medium">medium</span>
+            <strong>SmellType.SCATTERED_FUNCTIONALITY</strong>
+        </div>
+        <p class="smell-detail">'Factory' pattern is scattered across 3 components: Cmd, Examples, Internal</p>
+        <p class="smell-detail"><strong>Why:</strong> When a single concern is spread across many components, changes to that concern require modifying multiple places, increasing the risk of inconsistencies and bugs.</p>
+        <p class="smell-detail"><strong>Fix:</strong> Centralize 'Factory'-related functionality into a dedicated component to reduce scattering.</p>
+        <p class="smell-detail"><strong>Affects:</strong> Cmd, Examples, Internal</p>
+    </div>
+    
+    <div class="smell medium">
+        <div class="smell-header">
+            <span class="badge medium">medium</span>
+            <strong>SmellType.SCATTERED_FUNCTIONALITY</strong>
+        </div>
+        <p class="smell-detail">'Handler' pattern is scattered across 3 components: Cmd, Examples, Internal</p>
+        <p class="smell-detail"><strong>Why:</strong> When a single concern is spread across many components, changes to that concern require modifying multiple places, increasing the risk of inconsistencies and bugs.</p>
+        <p class="smell-detail"><strong>Fix:</strong> Centralize 'Handler'-related functionality into a dedicated component to reduce scattering.</p>
+        <p class="smell-detail"><strong>Affects:</strong> Cmd, Examples, Internal</p>
+    </div>
+    
+    
+
+    <h2 id="dependencies">Dependency Summary</h2>
+    <div class="card">
+        <table>
+            <thead><tr><th>Package</th><th>Entities</th></tr></thead>
+            <tbody>
+            
+                <tr>
+                    <td><code>internal.proto-gen.storage_v1.mocks</code></td>
+                    <td>580</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.proto-gen.storage.v2</code></td>
+                    <td>502</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.proto-gen.storage_v1</code></td>
+                    <td>422</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.proto-gen.api_v2.metrics</code></td>
+                    <td>405</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.proto.api_v3</code></td>
+                    <td>364</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.elasticsearch.mocks</code></td>
+                    <td>220</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.jaeger.internal.extension.jaegerquery.internal</code></td>
+                    <td>109</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.proto-gen.zipkin</code></td>
+                    <td>84</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.cassandra.mocks</code></td>
+                    <td>78</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.elasticsearch.client.mocks</code></td>
+                    <td>78</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v1.mocks</code></td>
+                    <td>78</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v2.api.tracestore.mocks</code></td>
+                    <td>70</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v1.cassandra.spanstore.dbmodel</code></td>
+                    <td>63</td>
+                </tr>
+            
+                <tr>
+                    <td><code>examples.hotrod.services.driver</code></td>
+                    <td>62</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v1.cassandra.spanstore</code></td>
+                    <td>62</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.integration</code></td>
+                    <td>58</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.metricstore.elasticsearch</code></td>
+                    <td>57</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v2.elasticsearch.tracestore.core</code></td>
+                    <td>56</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.jaeger.internal.extension.jaegerquery.internal.jaegerai</code></td>
+                    <td>55</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.sampling.samplingstrategy.adaptive</code></td>
+                    <td>55</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v2.memory</code></td>
+                    <td>55</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v2.elasticsearch.tracestore</code></td>
+                    <td>51</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v1.cassandra.spanstore.mocks</code></td>
+                    <td>50</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v2.elasticsearch.tracestore.core.mocks</code></td>
+                    <td>50</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.jaeger.internal.extension.jaegerquery.internal.adjuster</code></td>
+                    <td>49</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.jaeger.internal.extension.jaegermcp.internal.handlers</code></td>
+                    <td>48</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.elasticsearch.wrapper</code></td>
+                    <td>47</td>
+                </tr>
+            
+                <tr>
+                    <td><code>examples.hotrod.pkg.log</code></td>
+                    <td>46</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v2.cassandra.tracestore</code></td>
+                    <td>45</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v2.v1adapter</code></td>
+                    <td>45</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v1.api.spanstore.mocks</code></td>
+                    <td>44</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v2.grpc</code></td>
+                    <td>44</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.metricstest</code></td>
+                    <td>41</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v1.badger.spanstore</code></td>
+                    <td>41</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.metrics.prometheus</code></td>
+                    <td>38</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.jptrace</code></td>
+                    <td>35</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v2.clickhouse.tracestore</code></td>
+                    <td>35</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.elasticsearch.client</code></td>
+                    <td>33</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.internal.flags</code></td>
+                    <td>31</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.elasticsearch.config</code></td>
+                    <td>31</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v2.api.depstore.mocks</code></td>
+                    <td>30</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.metrics</code></td>
+                    <td>29</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.tenancy</code></td>
+                    <td>29</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v1.api.samplingstore.mocks</code></td>
+                    <td>28</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v1.badger</code></td>
+                    <td>28</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.jaeger.internal.integration</code></td>
+                    <td>27</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.jaeger.internal.extension.jaegerquery.internal.apiv3</code></td>
+                    <td>26</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.jaeger.internal.extension.jaegermcp.internal.types</code></td>
+                    <td>25</td>
+                </tr>
+            
+                <tr>
+                    <td><code>examples.hotrod.pkg.tracing.rpcmetrics</code></td>
+                    <td>25</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.sampling.samplingstrategy.file</code></td>
+                    <td>25</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v1.cassandra</code></td>
+                    <td>24</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.converter.thrift.jaeger</code></td>
+                    <td>23</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.uimodel.converter.v1.json</code></td>
+                    <td>23</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.jaeger.internal.extension.jaegermcp</code></td>
+                    <td>22</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.leaderelection.mocks</code></td>
+                    <td>22</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v1.api.metricstore.mocks</code></td>
+                    <td>22</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v2.elasticsearch.depstore.mocks</code></td>
+                    <td>22</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.jaeger.internal.extension.jaegerstorage</code></td>
+                    <td>21</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.headerforwarding</code></td>
+                    <td>21</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v1.cassandra.samplingstore</code></td>
+                    <td>21</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v1.api.dependencystore.mocks</code></td>
+                    <td>20</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v2.clickhouse.clickhousetest</code></td>
+                    <td>20</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v2.clickhouse</code></td>
+                    <td>20</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.jaeger.internal.extension.jaegerquery</code></td>
+                    <td>19</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.metrics.otelmetrics</code></td>
+                    <td>19</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v2.clickhouse.tracestore.dbmodel</code></td>
+                    <td>19</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.testutils</code></td>
+                    <td>19</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.jaeger.internal.extension.remotesampling</code></td>
+                    <td>18</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.jptrace.sanitizer</code></td>
+                    <td>18</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.metricstore.prometheus.metricstore</code></td>
+                    <td>18</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v2.elasticsearch.tracestore.core.dbmodel</code></td>
+                    <td>18</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.jaeger.internal.extension.jaegerquery.querysvc</code></td>
+                    <td>17</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.cassandra.gocql</code></td>
+                    <td>17</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v1.elasticsearch</code></td>
+                    <td>17</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v1.elasticsearch.mappings</code></td>
+                    <td>17</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.distributedlock.mocks</code></td>
+                    <td>16</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v2.elasticsearch.depstore</code></td>
+                    <td>16</td>
+                </tr>
+            
+                <tr>
+                    <td><code>monitoring.jaeger-mixin.generate</code></td>
+                    <td>16</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.es-rollover.app</code></td>
+                    <td>15</td>
+                </tr>
+            
+                <tr>
+                    <td><code>examples.hotrod.pkg.tracing</code></td>
+                    <td>15</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v1.badger.samplingstore</code></td>
+                    <td>15</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.anonymizer.app.anonymizer</code></td>
+                    <td>14</td>
+                </tr>
+            
+                <tr>
+                    <td><code>examples.hotrod.services.frontend</code></td>
+                    <td>14</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.gzipfs</code></td>
+                    <td>14</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v2.clickhouse.metricstore</code></td>
+                    <td>14</td>
+                </tr>
+            
+                <tr>
+                    <td><code>examples.hotrod.services.customer</code></td>
+                    <td>13</td>
+                </tr>
+            
+                <tr>
+                    <td><code>examples.hotrod.services.route</code></td>
+                    <td>13</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.elasticsearch</code></td>
+                    <td>13</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.elasticsearch.query</code></td>
+                    <td>13</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v1.api.spanstore.spanstoremetrics</code></td>
+                    <td>13</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v1.elasticsearch.samplingstore</code></td>
+                    <td>13</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v2.cassandra</code></td>
+                    <td>13</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v2.clickhouse.depstore</code></td>
+                    <td>13</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.uimodel</code></td>
+                    <td>13</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.cache</code></td>
+                    <td>12</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.cassandra.config</code></td>
+                    <td>12</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.integration.capabilities</code></td>
+                    <td>12</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.internal.storageconfig</code></td>
+                    <td>11</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.jaeger.internal.extension.jaegerquery.internal.qualitymetrics</code></td>
+                    <td>11</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.remote-storage.app</code></td>
+                    <td>11</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.auth.bearertoken</code></td>
+                    <td>11</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.sampling.http</code></td>
+                    <td>11</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v1.cassandra.dependencystore</code></td>
+                    <td>11</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v2.api.tracestore</code></td>
+                    <td>11</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v2.api.tracestore.tracestoremetrics</code></td>
+                    <td>11</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.jaeger.internal.exporters.storageexporter</code></td>
+                    <td>10</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.jaeger.internal.extension.remotestorage</code></td>
+                    <td>10</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.jaeger.internal.integration.storagecleaner</code></td>
+                    <td>10</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.jaeger.internal.processors.adaptivesampling</code></td>
+                    <td>10</td>
+                </tr>
+            
+                <tr>
+                    <td><code>examples.hotrod.cmd</code></td>
+                    <td>10</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.config.tlscfg</code></td>
+                    <td>10</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.leaderelection</code></td>
+                    <td>10</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.jaeger.internal.extension.expvar</code></td>
+                    <td>9</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v1.blackhole</code></td>
+                    <td>9</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v1.cassandra.schema</code></td>
+                    <td>9</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v2.badger</code></td>
+                    <td>9</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v2.elasticsearch</code></td>
+                    <td>9</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.anonymizer.app.uiconv</code></td>
+                    <td>8</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.es-rollover.app.init</code></td>
+                    <td>8</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.jaeger.internal.extension.jaegermcp.internal.criticalpath</code></td>
+                    <td>8</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.gogocodec</code></td>
+                    <td>8</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.metricstore.prometheus.metricstore.dbmodel</code></td>
+                    <td>8</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v1.api.metricstore.metricstoremetrics</code></td>
+                    <td>8</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.telemetry.otelsemconv</code></td>
+                    <td>8</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.es-index-cleaner.app</code></td>
+                    <td>7</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.es-rollover.app.lookback</code></td>
+                    <td>7</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.jaeger.internal.extension.jaegerquery.internal.jaegerai.aihealth</code></td>
+                    <td>7</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.config</code></td>
+                    <td>7</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.fswatcher</code></td>
+                    <td>7</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.jtracer</code></td>
+                    <td>7</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.elasticsearch.filter</code></td>
+                    <td>7</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.elasticsearch.indices</code></td>
+                    <td>7</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.metricstore.disabled</code></td>
+                    <td>7</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.metricstore.prometheus</code></td>
+                    <td>7</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v1.cassandra.savetracetest</code></td>
+                    <td>7</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.tracegen</code></td>
+                    <td>7</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.version</code></td>
+                    <td>7</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.es-rollover.app.rollover</code></td>
+                    <td>6</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.jaeger.internal</code></td>
+                    <td>6</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.jaeger.internal.telemetryfactory</code></td>
+                    <td>6</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.auth</code></td>
+                    <td>6</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v1.badger.dependencystore</code></td>
+                    <td>6</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v1</code></td>
+                    <td>6</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v1.elasticsearch.samplingstore.dbmodel</code></td>
+                    <td>6</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.anonymizer.app.query</code></td>
+                    <td>5</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.anonymizer.app.writer</code></td>
+                    <td>5</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.jaeger.internal.extension.jaegerquery.internal.ddg</code></td>
+                    <td>5</td>
+                </tr>
+            
+                <tr>
+                    <td><code>examples.hotrod.pkg.httperr</code></td>
+                    <td>5</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.metrics.metricsbuilder</code></td>
+                    <td>5</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.cassandra</code></td>
+                    <td>5</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.distributedlock.cassandra</code></td>
+                    <td>5</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v1.api.metricstore</code></td>
+                    <td>5</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v1.elasticsearch.dependencystore</code></td>
+                    <td>5</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.telemetry</code></td>
+                    <td>5</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.sampling.samplingstrategy.adaptive.calculationstrategy</code></td>
+                    <td>4</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v1.api.spanstore</code></td>
+                    <td>4</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v2.api.depstore</code></td>
+                    <td>4</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v2.elasticsearch.depstore.dbmodel</code></td>
+                    <td>4</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.es-index-cleaner</code></td>
+                    <td>3</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.es-rollover</code></td>
+                    <td>3</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.internal.docs</code></td>
+                    <td>3</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.internal.printconfig</code></td>
+                    <td>3</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.internal.status</code></td>
+                    <td>3</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.tracegen</code></td>
+                    <td>3</td>
+                </tr>
+            
+                <tr>
+                    <td><code>examples.hotrod.pkg.pool</code></td>
+                    <td>3</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.auth.apikey</code></td>
+                    <td>3</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.httpfs</code></td>
+                    <td>3</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.recoveryhandler</code></td>
+                    <td>3</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.sampling.grpc</code></td>
+                    <td>3</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.sampling.samplingstrategy</code></td>
+                    <td>3</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.cassandra.gocql.testutils</code></td>
+                    <td>3</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.cassandra.metrics</code></td>
+                    <td>3</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v1.api.samplingstore.model</code></td>
+                    <td>3</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.anonymizer.app</code></td>
+                    <td>2</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.anonymizer</code></td>
+                    <td>2</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.internal.featuregate</code></td>
+                    <td>2</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.remote-storage</code></td>
+                    <td>2</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.config.promcfg</code></td>
+                    <td>2</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.grpctest</code></td>
+                    <td>2</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.hostname</code></td>
+                    <td>2</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.jiter</code></td>
+                    <td>2</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v1.api.dependencystore</code></td>
+                    <td>2</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.esmapping-generator</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.jaeger.internal.extension.jaegerquery.internal.ui</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>cmd.jaeger</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>examples.hotrod</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>examples.hotrod.pkg.delay</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.distributedlock</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.jaegerclientenv2otel</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.safeexpvar</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.metricstore</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>internal.storage.v1.api.samplingstore</code></td>
+                    <td>1</td>
+                </tr>
+            
+                <tr>
+                    <td><code>ports</code></td>
+                    <td>1</td>
+                </tr>
+            
+            </tbody>
+        </table>
+    </div>
+
+    <footer>
+        Generated by arcade-agent &mdash; software architecture analysis toolkit
+    </footer>
+
+    <script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+</body>
+</html>

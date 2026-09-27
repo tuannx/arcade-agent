@@ -1,0 +1,137 @@
+{
+  "adr": "jaegertracing/jaeger ADR-014: Synchronous Elasticsearch writes",
+  "pr": "https://github.com/jaegertracing/jaeger/pull/9093",
+  "base_stats": {
+    "entities": 5949,
+    "edges": 9511,
+    "components": 6,
+    "smells": 4
+  },
+  "head_stats": {
+    "entities": 5953,
+    "edges": 9519,
+    "components": 6,
+    "smells": 4
+  },
+  "changelog": {
+    "refs": {
+      "a": "base e25782b6",
+      "b": "head f4c6acf1 (PR #9093)"
+    },
+    "components": {
+      "added": [],
+      "removed": [],
+      "renamed": [],
+      "split": [],
+      "merged": [],
+      "rewritten": [],
+      "stable": [
+        "Cmd",
+        "Components",
+        "Examples",
+        "Internal",
+        "Monitoring",
+        "Ports"
+      ]
+    },
+    "responsibility_shifts": [],
+    "smells": {
+      "new": [],
+      "resolved": [],
+      "persisting": [
+        {
+          "smell_type": "Dependency Cycle",
+          "severity": "medium",
+          "affected_components": [
+            "Cmd",
+            "Examples",
+            "Internal"
+          ],
+          "description": "Circular dependency among 3 components: Cmd <-> Examples <-> Internal"
+        },
+        {
+          "smell_type": "Scattered Parasitic Functionality",
+          "severity": "medium",
+          "affected_components": [
+            "Cmd",
+            "Components",
+            "Examples",
+            "Internal"
+          ],
+          "description": "'Factory' pattern is scattered across 4 components: Cmd, Components, Examples, Internal"
+        },
+        {
+          "smell_type": "Scattered Parasitic Functionality",
+          "severity": "medium",
+          "affected_components": [
+            "Cmd",
+            "Components",
+            "Internal"
+          ],
+          "description": "'Config' pattern is scattered across 3 components: Cmd, Components, Internal"
+        },
+        {
+          "smell_type": "Scattered Parasitic Functionality",
+          "severity": "medium",
+          "affected_components": [
+            "Cmd",
+            "Examples",
+            "Internal"
+          ],
+          "description": "'Handler' pattern is scattered across 3 components: Cmd, Examples, Internal"
+        }
+      ]
+    },
+    "metrics": {
+      "BasicMQ": {
+        "a": 0.7684,
+        "b": 0.7684,
+        "delta": 0.0
+      },
+      "InterConnectivity": {
+        "a": 0.0013,
+        "b": 0.0013,
+        "delta": 0.0
+      },
+      "IntraConnectivity": {
+        "a": 0.0409,
+        "b": 0.0409,
+        "delta": 0.0
+      },
+      "RCI": {
+        "a": 0.9539,
+        "b": 0.954,
+        "delta": 9.999999999998899e-05
+      },
+      "TurboMQ": {
+        "a": 4.6104,
+        "b": 4.6104,
+        "delta": 0.0
+      },
+      "TwoWayPairRatio": {
+        "a": 0.4,
+        "b": 0.4,
+        "delta": 0.0
+      }
+    },
+    "languages": {
+      "a": [
+        "go"
+      ],
+      "b": [
+        "go"
+      ]
+    },
+    "summary": {
+      "components_a": 6,
+      "components_b": 6,
+      "shifts": 0,
+      "entities_a": 5949,
+      "entities_b": 5953,
+      "entities_added": 4,
+      "entities_deleted": 0,
+      "smells_new": 0,
+      "smells_resolved": 0
+    }
+  }
+}

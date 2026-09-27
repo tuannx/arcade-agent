@@ -36,6 +36,7 @@ nav.top a{margin-right:18px;text-decoration:none;color:var(--mut)}nav.top a:hove
 <a href="./index.html#scale">Scale benchmark</a>
 <a href="./index.html#prs">PR case studies</a>
 <a href="./synthetic.html">Synthetic demo</a>
+<a href="./adr-autopsies.html">ADR Autopsies</a>
 <a href="./index.html#method">Methodology</a>
 <a href="https://github.com/arcade-agent/arcade-agent">GitHub</a>
 </div></nav><div class="wrap">
@@ -101,6 +102,19 @@ Same pipeline, same <code>changelog_architecture</code>. Result: <b>2 smells →
 <div><div class="v">0.2s</div><div class="k">analysis time</div></div>
 </div>
 <div class="meta"><a href="./reports/synthetic_before.html">Before report</a> · <a href="./reports/synthetic_after.html">After report</a></div></div>
+
+<h2 id="adr">ADR Autopsies: fact-checking architecture decisions</h2>
+<p>We take real Architecture Decision Records and verify each claim against the code before/after the
+implementing PR — graded CONFIRMED / PARTIAL / REFUTED / UNVERIFIABLE, with an effectiveness score.</p>
+<div class="card"><h3><a href="./adr-autopsies.html">Jaeger ADR-011 (facade packages): +0.75 · ADR-014 (control): clean</a></h3>
+<div class="meta">ADR-011's anti-cycle engineering held (0 new smells, 0 shifts) — but the exercise exposed a parser
+blind spot: 87 one-liner facade files yield 0 entities. Documented, not hidden.</div>
+<div class="kv">
+<div><div class="v">2</div><div class="k">ADRs autopsied</div></div>
+<div><div class="v">0</div><div class="k">hallucinated impacts</div></div>
+<div><div class="v">1</div><div class="k">tool blind spot found</div></div>
+</div>
+<div class="meta"><a href="./reports/adr011_head.html">ADR-011 head report</a> · <a href="./reports/adr014_head.html">ADR-014 head report</a></div></div>
 
 <h2 id="method">Methodology &amp; reproducibility</h2>
 <ul class="tight">

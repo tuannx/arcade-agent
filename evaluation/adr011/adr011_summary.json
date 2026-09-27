@@ -1,0 +1,115 @@
+{
+  "adr": "jaegertracing/jaeger ADR-011: Custom Distributions via Public Facade Packages",
+  "pr": "https://github.com/jaegertracing/jaeger/pull/8800",
+  "base_stats": {
+    "entities": 5903,
+    "edges": 9289,
+    "components": 5,
+    "smells": 3
+  },
+  "head_stats": {
+    "entities": 5904,
+    "edges": 9281,
+    "components": 5,
+    "smells": 3
+  },
+  "changelog": {
+    "refs": {
+      "a": "base 11b08c08",
+      "b": "head 8c5ed8c3 (PR #8800)"
+    },
+    "components": {
+      "added": [],
+      "removed": [],
+      "renamed": [],
+      "split": [],
+      "merged": [],
+      "rewritten": [],
+      "stable": [
+        "Cmd",
+        "Examples",
+        "Internal",
+        "Monitoring",
+        "Ports"
+      ]
+    },
+    "responsibility_shifts": [],
+    "smells": {
+      "new": [],
+      "resolved": [],
+      "persisting": [
+        {
+          "smell_type": "Dependency Cycle",
+          "severity": "medium",
+          "affected_components": [
+            "Cmd",
+            "Examples",
+            "Internal"
+          ],
+          "description": "Circular dependency among 3 components: Cmd <-> Examples <-> Internal"
+        },
+        {
+          "smell_type": "Scattered Parasitic Functionality",
+          "severity": "medium",
+          "affected_components": [
+            "Cmd",
+            "Examples",
+            "Internal"
+          ],
+          "description": "'Handler' pattern is scattered across 3 components: Cmd, Examples, Internal"
+        }
+      ]
+    },
+    "metrics": {
+      "BasicMQ": {
+        "a": 0.7566,
+        "b": 0.7563,
+        "delta": -0.000300000000000078
+      },
+      "InterConnectivity": {
+        "a": 0.0018,
+        "b": 0.0018,
+        "delta": 0.0
+      },
+      "IntraConnectivity": {
+        "a": 0.0294,
+        "b": 0.0294,
+        "delta": 0.0
+      },
+      "RCI": {
+        "a": 0.9567,
+        "b": 0.9567,
+        "delta": 0.0
+      },
+      "TurboMQ": {
+        "a": 3.7828,
+        "b": 3.7817,
+        "delta": -0.001100000000000101
+      },
+      "TwoWayPairRatio": {
+        "a": 0.5,
+        "b": 0.5,
+        "delta": 0.0
+      }
+    },
+    "languages": {
+      "a": [
+        "go"
+      ],
+      "b": [
+        "go"
+      ]
+    },
+    "summary": {
+      "components_a": 5,
+      "components_b": 5,
+      "shifts": 0,
+      "entities_a": 5903,
+      "entities_b": 5904,
+      "entities_added": 6,
+      "entities_deleted": 5,
+      "smells_new": 0,
+      "smells_resolved": 0
+    }
+  }
+}

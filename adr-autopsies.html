@@ -1,0 +1,117 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ADR Autopsies · arcade-agent evaluation</title><style>
+:root{--bg:#0d1117;--fg:#e6edf3;--mut:#8b949e;--acc:#58a6ff;--card:#161b22;--line:#30363d;--ok:#3fb950;--warn:#d29922;--bad:#f85149}
+*{box-sizing:border-box}body{background:var(--bg);color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;margin:0;line-height:1.6}
+.wrap{max-width:1020px;margin:0 auto;padding:0 24px}
+header.hero{padding:56px 0 32px;border-bottom:1px solid var(--line)}
+.hero h1{font-size:2.2rem;margin:0 0 8px}.hero h1 .a{color:var(--acc)}
+.hero p.sub{color:var(--mut);font-size:1.1rem;max-width:780px}
+.badges{margin:20px 0;display:flex;gap:10px;flex-wrap:wrap}
+.badge{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:4px 14px;font-size:.85rem;color:var(--mut)}
+.badge b{color:var(--fg)}
+.btn{display:inline-block;background:#1f6feb;color:#fff;padding:10px 22px;border-radius:8px;text-decoration:none;font-weight:600;margin:6px 8px 6px 0}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--fg)}
+h2{margin:44px 0 12px;font-size:1.5rem}h3{margin:26px 0 8px}
+table{width:100%;border-collapse:collapse;margin:16px 0;font-size:.95rem}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line)}
+th{color:var(--mut);font-weight:600}td.num{font-variant-numeric:tabular-nums}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px;margin:18px 0}
+.meta{color:var(--mut);font-size:.88rem;margin:8px 0}
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:16px 0}
+.kv div{background:#0d1117;border:1px solid var(--line);border-radius:8px;padding:10px 14px}
+.kv .v{font-size:1.35rem;font-weight:700}.kv .k{color:var(--mut);font-size:.8rem}
+.delta-up{color:var(--ok)}.delta-dn{color:var(--bad)}.delta-flat{color:var(--mut)}
+ul.tight li{margin:6px 0}code{background:#ffffff12;padding:2px 6px;border-radius:6px;font-size:.88em}
+pre{background:#0d1117;border:1px solid var(--line);border-radius:8px;padding:14px;overflow:auto;font-size:.85rem}
+footer{border-top:1px solid var(--line);margin-top:64px;padding:28px 0;color:var(--mut);font-size:.9rem}
+a{color:var(--acc)}nav.top{padding:14px 0;border-bottom:1px solid var(--line);font-size:.95rem}
+nav.top a{margin-right:18px;text-decoration:none;color:var(--mut)}nav.top a:hover{color:var(--fg)}
+.pill{display:inline-block;font-size:.78rem;border-radius:12px;padding:2px 12px;margin:2px 4px 2px 0}
+.pill.ok{background:#3fb95022;color:#3fb950;border:1px solid #3fb95055}
+.pill.warn{background:#d2992222;color:#d29922;border:1px solid #d2992255}
+.pill.na{background:#8b949e22;color:#8b949e;border:1px solid #8b949e55}
+.tag{display:inline-block;font-size:.75rem;border:1px solid var(--line);border-radius:12px;padding:1px 10px;color:var(--mut);margin-right:6px}
+</style></head>
+<body><nav class="top"><div class="wrap">
+<a href="./index.html"><b style="color:#e6edf3">arcade-agent</b> · evaluation</a>
+<a href="./index.html#scale">Scale benchmark</a>
+<a href="./index.html#prs">PR case studies</a>
+<a href="./synthetic.html">Synthetic demo</a>
+<a href="./adr-autopsies.html">ADR Autopsies</a>
+<a href="./index.html#method">Methodology</a>
+<a href="https://github.com/arcade-agent/arcade-agent">GitHub</a>
+</div></nav><div class="wrap">
+<header class="hero">
+<h1><span class="a">ADR Autopsies</span>: fact-checking architecture decisions</h1>
+<p class="sub">Every project writes Architecture Decision Records. Almost nobody checks whether the
+architecture actually did what the ADR promised. We run arcade-agent on both sides of the
+implementing PR and grade each claim: <b>CONFIRMED</b> / <b>PARTIAL</b> / <b>REFUTED</b> /
+<b>UNVERIFIABLE</b>. Method: <a href="https://github.com/tuannx/arcade-agent/tree/gh-pages/evaluation">reproducible scripts</a>.</p>
+<div class="badges">
+<span class="badge"><b>2</b> ADRs autopsied</span>
+<span class="badge"><b>jaegertracing/jaeger</b></span>
+<span class="badge">Effectiveness scores: <b>+0.75</b>, <b>+1.0</b> (control)</span>
+</div>
+</header>
+
+<h2>Autopsy #1 — ADR-011: Custom Distributions via Public Facade Packages</h2>
+<div class="card">
+<div class="meta"><a href="https://github.com/jaegertracing/jaeger/blob/main/docs/adr/011-custom-distributions.md">ADR-011</a>
+· implemented by <a href="https://github.com/jaegertracing/jaeger/pull/8800">PR #8800</a> (+1,410/−41, 102 files)
+· base <code>11b08c08</code> → head <code>8c5ed8c3</code></div>
+<p>Jaeger v2 components lived under <code>cmd/jaeger/internal/</code> — unimportable by design.
+The ADR chose a <b>double-dispatch public facade</b>: two layers of thin packages re-exporting
+<code>NewFactory</code> so users can build custom distributions with <code>ocb</code>.</p>
+<div class="kv">
+<div><div class="v">5,903 → 5,904</div><div class="k">entities</div></div>
+<div><div class="v">9,289 → 9,281</div><div class="k">edges</div></div>
+<div><div class="v">0</div><div class="k">responsibility shifts</div></div>
+<div><div class="v">3 → 3 <span class="delta-flat">(+0)</span></div><div class="k">smells</div></div>
+<div><div class="v delta-up">+0.75</div><div class="k">effectiveness score</div></div>
+</div>
+<table><tr><th>Claim</th><th>Verdict</th><th>Evidence</th></tr>
+<tr><td>No new import cycles (telemetryfactory breaks the would-be cycle)</td><td><span class="pill ok">CONFIRMED</span></td><td>0 new smells; pre-existing <code>Cmd↔Examples↔Internal</code> cycle byte-identical</td></tr>
+<tr><td>No new dependencies (facades re-export only)</td><td><span class="pill warn">PARTIAL</span></td><td>Edges flat, no new components — but tool can't see facade import edges (see below)</td></tr>
+<tr><td>Two new facade layers appear as a clean boundary</td><td><span class="pill na">UNVERIFIABLE</span></td><td>Go parser extracts func/type/method only — <code>var NewFactory = …</code> one-liners yield 0 entities across 87 new files</td></tr>
+<tr><td>Facades are thin one-liners</td><td><span class="pill na">UNVERIFIABLE</span></td><td>Same parser blind spot; true by inspection (~10 lines/file incl. license)</td></tr></table>
+<p><b>The honest finding:</b> the ADR's most deliberate files are invisible to the analyzer — a known
+parser gap (package-level declarations), now tracked as an improvement. A verification flow that can't
+see what it verifies has a documented hole, and documented holes get fixed.</p>
+<div class="meta"><a class="tag" href="./reports/adr011_base.html">base report</a>
+<a class="tag" href="./reports/adr011_head.html">head report</a></div>
+</div>
+
+<h2>Autopsy #2 — ADR-014: Synchronous Elasticsearch writes <span class="pill ok">control</span></h2>
+<div class="card">
+<div class="meta"><a href="https://github.com/jaegertracing/jaeger/blob/main/docs/adr/014-synchronous-elasticsearch-writes.md">ADR-014</a>
+· implemented by <a href="https://github.com/jaegertracing/jaeger/pull/9093">PR #9093</a> (+178/−17, 7 files)</div>
+<p>A behavioral ADR: add a <code>write_mode</code> config for synchronous ES writes. Structurally,
+almost nothing should move — the control experiment for the method.</p>
+<div class="kv">
+<div><div class="v">5,949 → 5,953</div><div class="k">entities (+4)</div></div>
+<div><div class="v">0</div><div class="k">responsibility shifts</div></div>
+<div><div class="v">4 → 4 <span class="delta-flat">(+0)</span></div><div class="k">smells</div></div>
+<div><div class="v">≈0</div><div class="k">metric deltas</div></div>
+</div>
+<p><span class="pill ok">CONFIRMED</span> — no structural regression. The tool correctly reports
+~zero architectural change for a behavioral decision: it doesn't hallucinate impact.</p>
+<div class="meta"><a class="tag" href="./reports/adr014_base.html">base report</a>
+<a class="tag" href="./reports/adr014_head.html">head report</a></div>
+</div>
+
+<h2>Open bounty</h2>
+<p>We haven't found a public ADR that made the architecture <em>worse</em> — nobody writes those down.
+Know a decision PR that introduced a cycle, a god module, or a dependency hairball?
+<a href="https://github.com/arcade-agent/arcade-agent/discussions">Nominate it</a> — the next autopsy
+will measure exactly how much damage it did.</p>
+
+<h2>Reproduce</h2>
+<pre>pip install "arcade-agent[languages]"
+# evaluation/adr011/ and evaluation/adr014/ on the gh-pages branch:
+python run_adr_jaeger.py      # ADR-011, PR #8800
+python run_adr_jaeger014.py   # ADR-014, PR #9093</pre>
+
+<footer>Part of the <a href="./index.html">arcade-agent evaluation</a> · generated 2026-09-27 ·
+<a href="https://github.com/arcade-agent/arcade-agent">arcade-agent on GitHub</a></footer>
+</div></body></html>
