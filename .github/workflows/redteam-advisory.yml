@@ -1,0 +1,217 @@
+name: Redteam Advisory
+
+on:
+  push:
+    branches: [main, "codex/**"]
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+    inputs:
+      base:
+        description: Optional base SHA (defaults to merge-base with main).
+        required: false
+      head:
+        description: Optional head SHA (defaults to the dispatched commit).
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: redteam-advisory-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  advisory:
+    if: github.repository == 'tuannx/arcade-agent'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PYTHONHASHSEED: "0"
+      TZ: UTC
+      LC_ALL: C
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Record exact comparison
+        id: snapshot
+        run: |
+          mkdir -p redteam-evidence
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          import subprocess
+          from pathlib import Path
+
+          event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text())
+          pr = event.get("pull_request")
+          if pr:
+              base, head = pr["base"]["sha"], pr["head"]["sha"]
+          else:
+              inputs = event.get("inputs") or {}
+              head = inputs.get("head") or event.get("after") or os.environ["GITHUB_SHA"]
+              base = inputs.get("base") or event.get("before") or ""
+              if not base or base == "0" * 40:
+                  base = subprocess.check_output(
+                      ["git", "merge-base", "origin/main", head], text=True
+                  ).strip()
+          for sha in (base, head):
+              if not re.fullmatch(r"[0-9a-f]{40}", sha):
+                  raise ValueError("expected a full commit SHA")
+              subprocess.run(["git", "cat-file", "-e", f"{sha}^{{commit}}"], check=True)
+          snapshot = {
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "event": os.environ["GITHUB_EVENT_NAME"],
+              "runId": os.environ["GITHUB_RUN_ID"],
+              "runAttempt": os.environ["GITHUB_RUN_ATTEMPT"],
+              "baseSha": base,
+              "headSha": head,
+              "doctrineSha": "0ee5a2e48f16c5e3274fceb1f6c390a10aaaedb2",
+              "scope": "advisory unsigned staging source; owner review required",
+          }
+          Path("redteam-evidence/snapshot.json").write_text(json.dumps(snapshot, indent=2) + "\n")
+          epoch = subprocess.check_output(["git", "show", "-s", "--format=%ct", head], text=True).strip()
+          with open(os.environ["GITHUB_ENV"], "a") as output:
+              output.write(f"SOURCE_DATE_EPOCH={epoch}\n")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(f"base={base}\nhead={head}\n")
+          PY
+
+      - name: Start first adapter measurement
+        run: python3 -c 'import time; from pathlib import Path; Path("redteam-evidence/first.start").write_text(str(time.time_ns()))'
+
+      - name: First advisory verdict
+        id: first
+        continue-on-error: true
+        uses: tuannx/redteam-doctrine@0ee5a2e48f16c5e3274fceb1f6c390a10aaaedb2
+        with:
+          base: ${{ steps.snapshot.outputs.base }}
+          head: ${{ steps.snapshot.outputs.head }}
+          verdict-path: redteam-evidence/first.json
+          comment: "false"
+          python-version: "3.12"
+
+      - name: Measure first adapter and start repeat
+        if: always() && steps.snapshot.outcome == 'success'
+        run: |
+          python3 - <<'PY'
+          import time
+          from pathlib import Path
+          now = time.time_ns()
+          start = int(Path("redteam-evidence/first.start").read_text())
+          Path("redteam-evidence/first.seconds").write_text(str((now - start) / 1e9))
+          Path("redteam-evidence/second.start").write_text(str(now))
+          PY
+
+      - name: Repeat advisory verdict
+        id: second
+        if: always() && steps.snapshot.outcome == 'success'
+        continue-on-error: true
+        uses: tuannx/redteam-doctrine@0ee5a2e48f16c5e3274fceb1f6c390a10aaaedb2
+        with:
+          base: ${{ steps.snapshot.outputs.base }}
+          head: ${{ steps.snapshot.outputs.head }}
+          verdict-path: redteam-evidence/second.json
+          comment: "false"
+          python-version: "3.12"
+
+      - name: Verify evidence and report measured ratios
+        if: always() && steps.snapshot.outcome == 'success'
+        env:
+          FIRST_OUTCOME: ${{ steps.first.outcome }}
+          SECOND_OUTCOME: ${{ steps.second.outcome }}
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import importlib.metadata
+          import json
+          import os
+          import platform
+          import pr_redteam.cli
+          import pr_redteam.core
+          import subprocess
+          import time
+          from pathlib import Path
+
+          now = time.time_ns()
+          evidence = Path("redteam-evidence")
+          second_seconds = (now - int((evidence / "second.start").read_text())) / 1e9
+          snapshot = json.loads((evidence / "snapshot.json").read_text())
+          expected = {"baseSha": snapshot["baseSha"], "headSha": snapshot["headSha"]}
+          records = []
+          for name, outcome, seconds in (
+              ("first", os.environ["FIRST_OUTCOME"], float((evidence / "first.seconds").read_text())),
+              ("second", os.environ["SECOND_OUTCOME"], second_seconds),
+          ):
+              path = evidence / f"{name}.json"
+              normalized_hash = subprocess.check_output(
+                  ["pr_redteam", "verify", "--verdict", str(path)], text=True
+              ).strip()
+              verdict = json.loads(path.read_text())
+              if verdict["pr"] != expected:
+                  raise ValueError("verdict SHA pair differs from the recorded comparison")
+              if verdict["routing"]["selfMergeEligible"]:
+                  raise ValueError("advisory evidence cannot authorize self-merge")
+              if verdict["counters"]["protectedPathHits"] and not verdict["routing"]["maintainerReviewRequired"]:
+                  raise ValueError("protected paths require maintainer review")
+              if outcome != ("failure" if verdict["verdict"] == "block" else "success"):
+                  raise ValueError("Action outcome differs from its fresh verdict")
+              subprocess.run(
+                  ["pr_redteam", "render", "--verdict", str(path)],
+                  stdout=(evidence / f"{name}.md").open("w"), check=True,
+              )
+              records.append({
+                  "name": name, "adapterOutcome": outcome,
+                  "adapterElapsedSeconds": seconds,
+                  "normalizedHash": normalized_hash,
+                  "artifactSha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                  "verdict": verdict["verdict"], "checks": verdict["checks"],
+                  "counters": verdict["counters"], "routing": verdict["routing"],
+              })
+          deterministic = records[0]["normalizedHash"] == records[1]["normalizedHash"]
+          result = {
+              "snapshot": snapshot, "records": records,
+              "scores": {
+                  "schemaValid": {"numerator": 2, "denominator": 2},
+                  "exactShaBinding": {"numerator": 2, "denominator": 2},
+                  "adapterVerdictAgreement": {"numerator": 2, "denominator": 2},
+                  "normalizedHashAgreement": {"numerator": int(deterministic), "denominator": 1},
+              },
+              "toolVersions": {"python": platform.python_version(), "pr-redteam": importlib.metadata.version("pr-redteam"), "ruff": importlib.metadata.version("ruff")},
+              "runtimeFiles": [
+                  {"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+                  for path in (
+                      Path(pr_redteam.cli.__file__), Path(pr_redteam.core.__file__),
+                      pr_redteam.cli.SCHEMA_PATH,
+                  )
+              ],
+              "measurementScope": "adapter wall time includes setup/install and step boundaries; no aggregate quality score",
+              "notRun": ["signed policy verification", "run attestation", "architecture predicates", "red-green test truth", "changed-line coverage", "mutation sampling"],
+              "identityScope": "MVP CLI actor defaults are not an authenticated CI identity; run provenance is recorded separately in snapshot",
+          }
+          (evidence / "measurement.json").write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
+          versions = sorted(f"{dist.metadata['Name']}=={dist.version}" for dist in importlib.metadata.distributions())
+          (evidence / "installed-versions.txt").write_text("\n".join(versions) + "\n")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as output:
+              output.write("Advisory unsigned staging source. No merge authorization.\n\n")
+              for name, score in result["scores"].items():
+                  output.write(f"- {name}: {score['numerator']}/{score['denominator']}\n")
+              for record in records:
+                  output.write(f"- {record['name']}: {record['verdict']}; unresolvedSymbols={record['checks']['unresolvedSymbols']}; adapter wall time={record['adapterElapsedSeconds']:.3f}s\n")
+          if not deterministic:
+              raise ValueError("normalized verdicts differ for the same input")
+          PY
+
+      - name: Upload advisory evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: redteam-advisory-${{ github.run_id }}-${{ github.run_attempt }}
+          path: redteam-evidence/
+          retention-days: 30
+          if-no-files-found: error
