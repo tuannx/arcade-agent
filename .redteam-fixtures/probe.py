@@ -1,2 +1,2 @@
 def redteam_probe():
-    return 42
+    return missing_redteam_probe
