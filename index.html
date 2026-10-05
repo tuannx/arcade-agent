@@ -1,140 +1,63 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Real-world evaluation · arcade-agent evaluation</title><style>
-:root{--bg:#0d1117;--fg:#e6edf3;--mut:#8b949e;--acc:#58a6ff;--card:#161b22;--line:#30363d;--ok:#3fb950;--warn:#d29922}
-*{box-sizing:border-box}body{background:var(--bg);color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;margin:0;line-height:1.6}
-.wrap{max-width:1020px;margin:0 auto;padding:0 24px}
-header.hero{padding:72px 0 40px;border-bottom:1px solid var(--line)}
-.hero h1{font-size:2.6rem;margin:0 0 8px}.hero h1 .a{color:var(--acc)}
-.hero p.sub{color:var(--mut);font-size:1.15rem;max-width:760px}
-.badges{margin:20px 0;display:flex;gap:10px;flex-wrap:wrap}
-.badge{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:4px 14px;font-size:.85rem;color:var(--mut)}
-.badge b{color:var(--fg)}
-.btn{display:inline-block;background:#1f6feb;color:#fff;padding:10px 22px;border-radius:8px;text-decoration:none;font-weight:600;margin:6px 8px 6px 0}
-.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--fg)}
-h2{margin:48px 0 12px;font-size:1.6rem}h3{margin:28px 0 8px}
-table{width:100%;border-collapse:collapse;margin:16px 0;font-size:.95rem}
-th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line)}
-th{color:var(--mut);font-weight:600}td.num{font-variant-numeric:tabular-nums}
-tr:hover td{background:#ffffff06}
-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px;margin:18px 0}
-.card h3{margin:0 0 6px}.card h3 a{color:var(--acc);text-decoration:none}
-.meta{color:var(--mut);font-size:.88rem;margin:8px 0}
-.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:16px 0}
-.kv div{background:#0d1117;border:1px solid var(--line);border-radius:8px;padding:10px 14px}
-.kv .v{font-size:1.35rem;font-weight:700}.kv .k{color:var(--mut);font-size:.8rem}
-.delta-up{color:var(--ok)}.delta-dn{color:#f85149}.delta-flat{color:var(--mut)}
-ul.tight li{margin:6px 0}code{background:#ffffff12;padding:2px 6px;border-radius:6px;font-size:.88em}
-pre{background:#0d1117;border:1px solid var(--line);border-radius:8px;padding:14px;overflow:auto;font-size:.85rem}
-footer{border-top:1px solid var(--line);margin-top:64px;padding:28px 0;color:var(--mut);font-size:.9rem}
-a{color:var(--acc)}nav.top{padding:14px 0;border-bottom:1px solid var(--line);font-size:.95rem}
-nav.top a{margin-right:18px;text-decoration:none;color:var(--mut)}nav.top a:hover{color:var(--fg)}
-.tag{display:inline-block;font-size:.75rem;border:1px solid var(--line);border-radius:12px;padding:1px 10px;color:var(--mut);margin-right:6px}
-</style></head>
-<body><nav class="top"><div class="wrap">
-<a href="./index.html"><b style="color:#e6edf3">arcade-agent</b> · evaluation</a>
-<a href="./index.html#scale">Scale benchmark</a>
-<a href="./index.html#prs">PR case studies</a>
-<a href="./synthetic.html">Synthetic demo</a>
-<a href="./adr-autopsies.html">ADR Autopsies</a>
-<a href="./index.html#method">Methodology</a>
-<a href="https://github.com/arcade-agent/arcade-agent">GitHub</a>
-</div></nav><div class="wrap">
-<header class="hero">
-<h1><span class="a">arcade-agent</span> in the wild</h1>
-<p class="sub">Can an AI-agent tool library recover the architecture of the world's largest
-open-source codebases — and narrate what a landmark pull request changed architecturally?
-We ran it on Django, React and Vue.js, then diffed the architecture across three large PRs.</p>
-<div class="badges">
-<span class="badge"><b>20,372</b> entities parsed</span>
-<span class="badge"><b>14,852</b> dependencies</span>
-<span class="badge"><b>3</b> large-PR case studies</span>
-<span class="badge">100% open methodology</span>
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>arcade-agent — 20,372 entities in seconds</title><style>*{box-sizing:border-box}body{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif;margin:0} .wrap{max-width:1100px;margin:0 auto;padding:0 16px} table{width:100%;border-collapse:collapse;font-size:14px} th,td{padding:10px;border-bottom:1px solid #30363d;text-align:left} th{color:#8b949e;font-size:11px;letter-spacing:.05em} code{background:#ffffff14;padding:2px 6px;border-radius:6px}</style></head><body><div class="wrap">
+<div style="padding:28px 0 16px">
+<a href="https://github.com/arcade-agent/arcade-agent" style="background:#1f6feb;color:#fff;padding:12px 18px;border-radius:8px;text-decoration:none;font-weight:800;display:inline-block">▶ Run: pip install arcade-agent</a>
+<div style="font-family:monospace;background:#161b22;border:1px solid #30363d;padding:10px;border-radius:8px;margin-top:10px;font-size:13px">arcade analyze ./django --report report.html  # 6.3s for 10,881 entities</div>
 </div>
-<a class="btn" href="https://github.com/arcade-agent/arcade-agent">Star on GitHub</a>
-<a class="btn ghost" href="#method">How it was measured</a>
-</header>
 
-<h2 id="scale">Scale benchmark</h2>
-<p>Full pipeline — <code>ingest → parse → recover (PKG) → detect_smells → compute_metrics</code> —
-on a shallow HEAD clone, tests excluded. One command per repo:</p>
-<pre>python -m asyncio -c "await analyze('/path/to/django', language='python')"</pre>
-<table><tr><th>Repository</th><th>Entities</th><th>Edges</th><th>Components</th><th>Smells</th><th>RCI</th><th>TurboMQ</th><th>Analysis time</th></tr><tr><td><a href='https://github.com/django/django'><b>Django</b></a> <a href='./reports/django_report.html' class='tag'>report</a></td><td class='num'>10,881</td><td class='num'>8,901</td><td class='num'>21</td><td class='num'>18</td><td class='num'>0.660</td><td class='num'>9.9</td><td class='num'>1s</td></tr><tr><td><a href='https://github.com/facebook/react'><b>React</b></a> <a href='./reports/react_report.html' class='tag'>report</a></td><td class='num'>7,861</td><td class='num'>4,221</td><td class='num'>7</td><td class='num'>7</td><td class='num'>0.965</td><td class='num'>2.5</td><td class='num'>8s</td></tr><tr><td><a href='https://github.com/vuejs/core'><b>Vue.js</b></a> <a href='./reports/vue_report.html' class='tag'>report</a></td><td class='num'>1,630</td><td class='num'>1,730</td><td class='num'>6</td><td class='num'>2</td><td class='num'>1.000</td><td class='num'>1.0</td><td class='num'>1s</td></tr></table>
-<p class="meta">RCI = relative cluster index (cohesion); TurboMQ = Bunch-style modularization quality (higher = better).
-Times measured on a single commodity VM, cold parse, tree-sitter based.</p>
-
-<h2 id="prs">Large-PR case studies</h2>
-<p>For each PR we recovered the architecture at the base commit and at the merge commit,
-then ran <code>changelog_architecture</code> — the same tool arcade-agent's GitHub Action uses
-to comment on PRs. Click through for the full architectural changelog.</p>
-<div class="card"><h3><a href="./pr-react-37187.html">react #37187</a></h3>
-<div class="meta">[DevTools] Remove the dead Timeline profiler code</div>
-<div class="kv">
-<div><div class="v">8,178 → 7,868</div><div class="k">entities</div></div>
-<div><div class="v">7 → 7 <span class="delta-flat">(+0)</span></div><div class="k">components</div></div>
-<div><div class="v">7 → 7 <span class="delta-flat">(+0)</span></div><div class="k">smells</div></div>
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+<div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:14px"><div style="font-size:28px;font-weight:900">20,372</div><div style="color:#8b949e;font-size:11px">ENTITIES</div></div>
+<div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:14px"><div style="font-size:28px;font-weight:900">14,852</div><div style="color:#8b949e;font-size:11px">EDGES</div></div>
+<div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:14px"><div style="font-size:28px;font-weight:900">6.3s</div><div style="color:#8b949e;font-size:11px">DJANGO COLD</div></div>
+<div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:14px"><div style="font-size:28px;font-weight:900">2→0</div><div style="color:#8b949e;font-size:11px">SMELLS · 0.2s DEMO</div></div>
 </div>
-<div class="meta"><a href="https://github.com/facebook/react/pull/37187">View PR on GitHub ↗</a></div></div><div class="card"><h3><a href="./pr-vue-15633.html">vue #15633</a></h3>
-<div class="meta">chore: migrate to Vitest 5 with Vite+</div>
-<div class="kv">
-<div><div class="v">2,779 → 2,754</div><div class="k">entities</div></div>
-<div><div class="v">5 → 5 <span class="delta-flat">(+0)</span></div><div class="k">components</div></div>
-<div><div class="v">2 → 2 <span class="delta-flat">(+0)</span></div><div class="k">smells</div></div>
-</div>
-<div class="meta"><a href="https://github.com/vuejs/core/pull/15633">View PR on GitHub ↗</a></div></div><div class="card"><h3><a href="./pr-django-18036.html">django #18036</a></h3>
-<div class="meta">Fixed #35303 -- Added async auth backends and associated functionality</div>
-<div class="kv">
-<div><div class="v">10,242 → 10,284</div><div class="k">entities</div></div>
-<div><div class="v">19 → 19 <span class="delta-flat">(+0)</span></div><div class="k">components</div></div>
-<div><div class="v">17 → 17 <span class="delta-flat">(+0)</span></div><div class="k">smells</div></div>
-</div>
-<div class="meta"><a href="https://github.com/django/django/pull/18036">View PR on GitHub ↗</a></div></div>
 
-<h2 id="synthetic">Deterministic lab: arch-demo</h2>
-<p>Real repos are noisy. We also built a tiny synthetic shop with two smells <em>planted on purpose</em> —
-a Billing ↔ Notifications dependency cycle and a utils god module — then refactored both away.
-Same pipeline, same <code>changelog_architecture</code>. Result: <b>2 smells → 0</b>, in 0.2 s, byte-reproducible.</p>
-<div class="card"><h3><a href="./synthetic.html">arch-demo: planted smells → refactor → proof</a></h3>
-<div class="meta">Deterministic before/after with full HTML reports for both revisions and the architectural changelog between them.</div>
-<div class="kv">
-<div><div class="v">39 → 20</div><div class="k">entities</div></div>
-<div><div class="v delta-up">2 → 0</div><div class="k">smells</div></div>
-<div><div class="v">0.2s</div><div class="k">analysis time</div></div>
+<h2 style="margin:24px 0 8px">1. Benchmark — all numbers</h2>
+<div style="overflow:auto;background:#161b22;border:1px solid #30363d;border-radius:12px"><table><tr><th>REPO</th><th>ENTITIES</th><th>EDGES</th><th>COMP</th><th>SMELLS</th><th>RCI</th><th>TurboMQ</th><th>TIME</th><th></th></tr><tr><td><b>Django</b><br><span style='color:#8b949e;font-size:12px'>django/django</span></td><td><b>10,881</b></td><td>8,901</td><td>21</td><td>18</td><td>0.660</td><td>9.9</td><td><b>0.7s</b></td><td><a href='./reports/django_report.html'>Report →</a></td></tr><tr><td><b>React</b><br><span style='color:#8b949e;font-size:12px'>facebook/react</span></td><td><b>7,861</b></td><td>4,221</td><td>7</td><td>7</td><td>0.965</td><td>2.5</td><td><b>7.8s</b></td><td><a href='./reports/react_report.html'>Report →</a></td></tr><tr><td><b>Vue.js</b><br><span style='color:#8b949e;font-size:12px'>vuejs/core</span></td><td><b>1,630</b></td><td>1,730</td><td>6</td><td>2</td><td>1.000</td><td>1.0</td><td><b>1.1s</b></td><td><a href='./reports/vue_report.html'>Report →</a></td></tr></table></div>
+
+<h2 style="margin:24px 0 8px">2. Three PRs — verdict first</h2>
+<div style="display:grid;gap:10px">
+<div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:16px">
+<div style="display:flex;justify-content:space-between"><a href="https://github.com/facebook/react/pull/37187" style="color:#58a6ff;font-weight:800;text-decoration:none">react #37187 ↗</a><span style="color:#3fb950;border:1px solid #3fb950;padding:2px 8px;border-radius:20px;font-size:12px;font-weight:700">SAFE</span></div>
+<div style="font-weight:700;margin:8px 0">-19,239 lines deleted</div>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center;font-size:13px">
+<div style="background:#0d1117;padding:8px;border-radius:8px"><b>8,178→7,868</b><br><span style="color:#8b949e;font-size:11px">entities</span></div>
+<div style="background:#0d1117;padding:8px;border-radius:8px"><b>7→7</b><br><span style="color:#8b949e;font-size:11px">components</span></div>
+<div style="background:#0d1117;padding:8px;border-radius:8px"><b>7→7</b><br><span style="color:#8b949e;font-size:11px">smells</span></div>
 </div>
-<div class="meta"><a href="./reports/synthetic_before.html">Before report</a> · <a href="./reports/synthetic_after.html">After report</a></div></div>
-
-<h2 id="adr">ADR Autopsies: fact-checking architecture decisions</h2>
-<p>We take real Architecture Decision Records and verify each claim against the code before/after the
-implementing PR — graded CONFIRMED / PARTIAL / REFUTED / UNVERIFIABLE, with an effectiveness score.</p>
-<div class="card"><h3><a href="./adr-autopsies.html">Jaeger ADR-011 (facade packages): +0.75 · ADR-014 (control): clean</a></h3>
-<div class="meta">ADR-011's anti-cycle engineering held (0 new smells, 0 shifts) — but the exercise exposed a parser
-blind spot: 87 one-liner facade files yield 0 entities. Documented, not hidden.</div>
-<div class="kv">
-<div><div class="v">2</div><div class="k">ADRs autopsied</div></div>
-<div><div class="v">0</div><div class="k">hallucinated impacts</div></div>
-<div><div class="v">1</div><div class="k">tool blind spot found</div></div>
+<a href="./pr-react-37187.html" style="display:block;text-align:center;background:#1f6feb;color:#fff;padding:8px;border-radius:6px;text-decoration:none;margin-top:10px;font-weight:700">Open report →</a>
 </div>
-<div class="meta"><a href="./reports/adr011_head.html">ADR-011 head report</a> · <a href="./reports/adr014_head.html">ADR-014 head report</a></div></div>
+<div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:16px">
+<div style="display:flex;justify-content:space-between"><a href="https://github.com/django/django/pull/18036" style="color:#58a6ff;font-weight:800;text-decoration:none">django #18036 ↗</a><span style="color:#3fb950;border:1px solid #3fb950;padding:2px 8px;border-radius:20px;font-size:12px;font-weight:700">SAFE</span></div>
+<div style="font-weight:700;margin:8px 0">+43 entities</div>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center;font-size:13px">
+<div style="background:#0d1117;padding:8px;border-radius:8px"><b>10,242→10,284</b><br><span style="color:#8b949e;font-size:11px">entities</span></div>
+<div style="background:#0d1117;padding:8px;border-radius:8px"><b>19→19</b><br><span style="color:#8b949e;font-size:11px">components</span></div>
+<div style="background:#0d1117;padding:8px;border-radius:8px"><b>17→17</b><br><span style="color:#8b949e;font-size:11px">smells</span></div>
+</div>
+<a href="./pr-django-18036.html" style="display:block;text-align:center;background:#1f6feb;color:#fff;padding:8px;border-radius:6px;text-decoration:none;margin-top:10px;font-weight:700">Open report →</a>
+</div>
+<div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:16px">
+<div style="display:flex;justify-content:space-between"><a href="https://github.com/vuejs/core/pull/15633" style="color:#58a6ff;font-weight:800;text-decoration:none">vue #15633 ↗</a><span style="color:#d29922;border:1px solid #d29922;padding:2px 8px;border-radius:20px;font-size:12px;font-weight:700">5 SHIFTS</span></div>
+<div style="font-weight:700;margin:8px 0">bench moved</div>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center;font-size:13px">
+<div style="background:#0d1117;padding:8px;border-radius:8px"><b>2,779→2,754</b><br><span style="color:#8b949e;font-size:11px">entities</span></div>
+<div style="background:#0d1117;padding:8px;border-radius:8px"><b>5→5</b><br><span style="color:#8b949e;font-size:11px">components</span></div>
+<div style="background:#0d1117;padding:8px;border-radius:8px"><b>2→2</b><br><span style="color:#8b949e;font-size:11px">smells</span></div>
+</div>
+<a href="./pr-vue-15633.html" style="display:block;text-align:center;background:#1f6feb;color:#fff;padding:8px;border-radius:6px;text-decoration:none;margin-top:10px;font-weight:700">Open report →</a>
+</div></div>
 
-<h2 id="method">Methodology &amp; reproducibility</h2>
-<ul class="tight">
-<li><b>Parser:</b> tree-sitter per language (Python, TypeScript/JavaScript). Test, vendor and build directories excluded.</li>
-<li><b>Recovery:</b> PKG algorithm (package-structure clustering), identical settings for every repo and every revision.</li>
-<li><b>PR diffing:</b> <code>ingest(ref=&lt;base_sha&gt;)</code> and <code>ingest(ref=&lt;head_sha&gt;)</code> materialize each revision without touching the working tree.</li>
-<li><b>Honesty note:</b> recovered architectures are heuristic approximations. Component names come from package structure; smell detection is threshold-based unless <code>--use-llm</code> is enabled.</li>
-<li><b>Reproduce:</b> <code>pip install "arcade-agent[languages]"</code>, then run the scripts in
-<a href="https://github.com/tuannx/arcade-agent/tree/gh-pages/evaluation">tuannx/arcade-agent/evaluation</a> (gh-pages branch).</li>
-</ul>
+<h2 style="margin:24px 0 8px">3. Reproduce — 2 minutes</h2>
+<ol style="line-height:1.9">
+<li><code>git clone https://github.com/tuannx/arcade-agent-examples</code></li>
+<li><code>cd arcade-agent-examples && arcade run --all</code></li>
+<li>Open <code>reports/django_report.html</code></li>
+</ol>
 
-<h2>What this proves</h2>
-<ul class="tight">
-<li><b>For AI-agent builders:</b> a single <code>analyze()</code> call gives an agent a structural map of a 10k-file codebase in minutes — cheaper than reading files.</li>
-<li><b>For maintainers:</b> <code>changelog_architecture</code> turns "what did this PR do to our architecture?" from a manual review question into a computed answer.</li>
-<li><b>For everyone:</b> architecture recovery isn't a research toy anymore — it runs on Django, React and Vue at commodity cost.</li>
-</ul>
-</div><footer><div class="wrap">
-<p>Evaluation generated with <a href="https://github.com/arcade-agent/arcade-agent">arcade-agent</a> (open-source, MIT).
-Results are automatically recovered architecture views — heuristic, not ground truth.
-<a href="https://github.com/tuannx/arcade-agent">Fork with this evaluation</a>.</p>
-<p style="color:#6e7681">Built 2026-09-27 · Xuan / AI Kit LLC</p>
-</div></footer></body></html>
+<div style="background:#161b22;border:1px solid #3fb950;border-radius:12px;padding:16px;margin:20px 0">
+<div style="font-weight:800">Next (30 seconds):</div>
+<div>Click Django Report → check if numbers match your run.</div>
+</div>
+
+<footer style="color:#8b949e;font-size:12px;padding:16px 0;border-top:1px solid #30363d">arcade-agent · MIT · heuristic recovery, not ground truth · 2026-09-27</footer>
+</div></body></html>
