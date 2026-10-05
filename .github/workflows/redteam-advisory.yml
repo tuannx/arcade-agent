@@ -30,6 +30,7 @@ jobs:
       PYTHONHASHSEED: "0"
       TZ: UTC
       LC_ALL: C
+      OWNER_CONTROLLED: ${{ github.actor == github.repository_owner && ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && startsWith(github.event.pull_request.head.ref, 'codex/')) || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/codex/')))) }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -82,13 +83,76 @@ jobs:
               output.write(f"base={base}\nhead={head}\n")
           PY
 
+      - name: Check private source access
+        id: distribution
+        env:
+          DOCTRINE_TOKEN: ${{ env.OWNER_CONTROLLED == 'true' && secrets.REDTEAM_DOCTRINE_TOKEN || '' }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+          from pathlib import Path
+
+          allowed = os.environ["OWNER_CONTROLLED"] == "true"
+          available = allowed and bool(os.environ.get("DOCTRINE_TOKEN"))
+          result = {
+              "repository": "tuannx/redteam-doctrine",
+              "sha": "0ee5a2e48f16c5e3274fceb1f6c390a10aaaedb2",
+              "status": "credentialAvailable" if available else "notRun",
+              "ownerControlledEvent": allowed,
+              "privateSourceFetched": False,
+              "scores": None,
+              "gates": {name: "notRun" for name in ("unresolvedSymbols", "secretPatterns", "schemaValidation", "shaBinding", "determinism", "signedPolicy", "attestation")},
+              "requiredAction": "Owner must provision REDTEAM_DOCTRINE_TOKEN with Contents:read restricted to tuannx/redteam-doctrine, and trust this exact workflow revision. No personal CLI credential is reused.",
+          }
+          Path("redteam-evidence/distribution.json").write_text(json.dumps(result, indent=2) + "\n")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(f"available={str(available).lower()}\n")
+          if not available:
+              with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as output:
+                  output.write("Private doctrine source unavailable. All gate scores are null and gates notRun. Owner-controlled event and a dedicated Contents:read source credential are required.\n")
+              print("::error::Private doctrine source unavailable; REDTEAM_DOCTRINE_TOKEN must be owner-provisioned with Contents:read on tuannx/redteam-doctrine. Gate scores remain null.")
+              sys.exit(1)
+          PY
+
+      - name: Checkout pinned private doctrine source
+        if: steps.distribution.outputs.available == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: tuannx/redteam-doctrine
+          ref: 0ee5a2e48f16c5e3274fceb1f6c390a10aaaedb2
+          path: .redteam-doctrine-tool
+          token: ${{ secrets.REDTEAM_DOCTRINE_TOKEN }}
+          persist-credentials: false
+
+      - name: Verify private source revision
+        id: private_source
+        if: steps.distribution.outputs.available == 'true'
+        run: |
+          python3 - <<'PY'
+          import json
+          import subprocess
+          from pathlib import Path
+
+          path = Path("redteam-evidence/distribution.json")
+          result = json.loads(path.read_text())
+          actual = subprocess.check_output(["git", "-C", ".redteam-doctrine-tool", "rev-parse", "HEAD"], text=True).strip()
+          if actual != result["sha"]:
+              raise ValueError("private source differs from the pinned doctrine SHA")
+          result.update(status="sourceFetched", privateSourceFetched=True, actualSha=actual)
+          path.write_text(json.dumps(result, indent=2) + "\n")
+          PY
+
       - name: Start first adapter measurement
+        if: steps.private_source.outcome == 'success'
         run: python3 -c 'import time; from pathlib import Path; Path("redteam-evidence/first.start").write_text(str(time.time_ns()))'
 
       - name: First advisory verdict
         id: first
+        if: steps.private_source.outcome == 'success'
         continue-on-error: true
-        uses: tuannx/redteam-doctrine@0ee5a2e48f16c5e3274fceb1f6c390a10aaaedb2
+        uses: ./.redteam-doctrine-tool
         with:
           base: ${{ steps.snapshot.outputs.base }}
           head: ${{ steps.snapshot.outputs.head }}
@@ -97,7 +161,7 @@ jobs:
           python-version: "3.12"
 
       - name: Measure first adapter and start repeat
-        if: always() && steps.snapshot.outcome == 'success'
+        if: always() && steps.private_source.outcome == 'success'
         run: |
           python3 - <<'PY'
           import time
@@ -110,9 +174,9 @@ jobs:
 
       - name: Repeat advisory verdict
         id: second
-        if: always() && steps.snapshot.outcome == 'success'
+        if: always() && steps.private_source.outcome == 'success'
         continue-on-error: true
-        uses: tuannx/redteam-doctrine@0ee5a2e48f16c5e3274fceb1f6c390a10aaaedb2
+        uses: ./.redteam-doctrine-tool
         with:
           base: ${{ steps.snapshot.outputs.base }}
           head: ${{ steps.snapshot.outputs.head }}
@@ -121,7 +185,7 @@ jobs:
           python-version: "3.12"
 
       - name: Verify evidence and report measured ratios
-        if: always() && steps.snapshot.outcome == 'success'
+        if: always() && steps.private_source.outcome == 'success'
         env:
           FIRST_OUTCOME: ${{ steps.first.outcome }}
           SECOND_OUTCOME: ${{ steps.second.outcome }}
@@ -195,6 +259,13 @@ jobs:
               "identityScope": "MVP CLI actor defaults are not an authenticated CI identity; run provenance is recorded separately in snapshot",
           }
           (evidence / "measurement.json").write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
+          distribution_path = evidence / "distribution.json"
+          distribution = json.loads(distribution_path.read_text())
+          distribution.update(status="measured", scores=result["scores"])
+          distribution["gates"]["unresolvedSymbols"] = records[0]["checks"]["unresolvedSymbols"]
+          for name in ("secretPatterns", "schemaValidation", "shaBinding", "determinism"):
+              distribution["gates"][name] = "measured"
+          distribution_path.write_text(json.dumps(distribution, indent=2) + "\n")
           versions = sorted(f"{dist.metadata['Name']}=={dist.version}" for dist in importlib.metadata.distributions())
           (evidence / "installed-versions.txt").write_text("\n".join(versions) + "\n")
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as output:
