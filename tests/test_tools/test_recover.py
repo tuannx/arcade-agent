@@ -3,6 +3,7 @@
 import pytest
 
 from arcade_agent.parsers.graph import DependencyGraph, Edge, Entity
+from arcade_agent.parsers.java import JavaParser
 from arcade_agent.tools.recover import recover
 
 
@@ -179,3 +180,53 @@ def test_package_entity_joins_its_sub_package_group():
 
     members = {c.name: set(c.entities) for c in arch.components}
     assert "app.api" in members["Api"]
+
+
+def test_pkg_recovery_respects_java_build_module_boundaries(tmp_path):
+    # Regression test (new finding, 2026-10-07): pkg recovery groups purely
+    # by package, so a multi-module Java build whose modules share one root
+    # package collapses into a single component and reports a perfect RCI.
+    # Whole-repo measurement of google/adk-java (12 Maven modules, packages
+    # under com.google.adk) produced 1 component / RCI 1.0 / 0 smells on
+    # 0.3.0 and one dominant package component on 0.4.0, while per-module
+    # runs recover real structure. Recovery should surface the build-module
+    # boundary (each module dir carries its own pom.xml).
+    modules = {
+        "module-a": {
+            "shop/core/Cart.java": (
+                "package shop.core;\n"
+                "public class Cart { public void add(Item item) {} }\n"
+            ),
+            "shop/core/Item.java": "package shop.core;\npublic class Item {}\n",
+        },
+        "module-b": {
+            "shop/core/Pricing.java": (
+                "package shop.core;\n"
+                "public class Pricing { public int price(Item item) { return 0; } }\n"
+            ),
+            "shop/core/Discount.java": "package shop.core;\npublic class Discount {}\n",
+        },
+    }
+    (tmp_path / "pom.xml").write_text(
+        "<project><modules><module>module-a</module>"
+        "<module>module-b</module></modules></project>\n"
+    )
+    for module, sources in modules.items():
+        (tmp_path / module).mkdir(parents=True, exist_ok=True)
+        (tmp_path / module / "pom.xml").write_text("<project/>\n")
+        for relative, source in sources.items():
+            target = tmp_path / module / "src/main/java" / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(source)
+
+    graph = JavaParser().parse(sorted(tmp_path.rglob("*.java")), tmp_path)
+    module_a = {"shop.core.Cart", "shop.core.Item"}
+    module_b = {"shop.core.Pricing", "shop.core.Discount"}
+    assert module_a | module_b <= set(graph.entities)
+
+    arch = recover(graph, algorithm="pkg")
+
+    assert len(arch.components) >= 2
+    for component in arch.components:
+        members = set(component.entities)
+        assert not (members & module_a and members & module_b)
