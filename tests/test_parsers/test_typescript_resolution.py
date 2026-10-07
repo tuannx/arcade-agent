@@ -11,6 +11,7 @@ from arcade_agent.parsers.typescript_resolution import (
     UnresolvedLocal,
     _strip_jsonc_comments,
     _strip_trailing_commas,
+    is_source_import,
 )
 
 
@@ -312,3 +313,45 @@ def test_explicit_jsonc_extends_is_read_without_changing_the_extension(tmp_path)
     assert resolver.resolve("@model", tmp_path / "use.ts") == ResolvedLocal(
         "model", "tsconfig_paths"
     )
+
+
+def test_catch_all_paths_mapping_treats_bare_import_as_external(tmp_path):
+    # Regression test for upstream issue #55 (item 1): a catch-all
+    # `paths: {"*": ["src/types/*"]}` mapping must not turn a bare package
+    # import into an unresolved local import when no source target exists;
+    # tsc falls back to node_modules, so the import is external.
+    resolver = _resolver(tmp_path, ["use.ts"])
+    (tmp_path / "tsconfig.json").write_text(
+        '{"compilerOptions":{"paths":{"*":["src/types/*"]}}}'
+    )
+    result = resolver.resolve("react", tmp_path / "use.ts")
+    assert isinstance(result, ExternalImport)
+    summary = resolver.summary({tmp_path / "use.ts": {"react": result}}, set())
+    assert summary["unresolved_local"] == 0
+    assert summary["metrics_qualified"] is False
+
+
+def test_package_based_extends_does_not_qualify_clean_project(tmp_path):
+    # Regression test for upstream issue #55 (item 2): a package-based
+    # `extends` such as `@tsconfig/node20` is valid configuration and must
+    # not mark the project configuration-incomplete (which forces
+    # metrics_qualified on every project that uses one).
+    resolver = _resolver(tmp_path, ["use.ts"])
+    (tmp_path / "tsconfig.json").write_text('{"extends":"@tsconfig/node20"}')
+    result = resolver.resolve("react", tmp_path / "use.ts")
+    assert isinstance(result, ExternalImport)
+    summary = resolver.summary({tmp_path / "use.ts": {"react": result}}, set())
+    assert summary["configuration_errors_affect_resolution"] is False
+    assert summary["metrics_qualified"] is False
+
+
+@pytest.mark.parametrize(
+    "specifier", ["./App.vue", "./App.svelte", "./App.astro", "./schema.graphql"]
+)
+def test_framework_file_suffixes_are_not_source_imports(tmp_path, specifier):
+    # Regression test for upstream issue #55 (item 3): framework/data file
+    # suffixes are not TypeScript source; counting them as unresolved
+    # relative imports qualifies every Vue/Svelte/Astro project.
+    resolver = _resolver(tmp_path, ["use.ts"])
+    assert not is_source_import(specifier)
+    assert isinstance(resolver.resolve(specifier, tmp_path / "use.ts"), ExternalImport)
