@@ -78,6 +78,26 @@ def test_java_parser_extracts_methods(java_files, fixtures_dir):
     )
 
 
+def test_java_parser_single_segment_package(tmp_path):
+    # Regression test for upstream issue #27: a single-segment package
+    # declaration (`package auth;`) must qualify entity FQNs, populate the
+    # package field, and let dotted imports resolve to the entity.
+    (tmp_path / "Login.java").write_text("package auth;\npublic class Login {}\n")
+    (tmp_path / "App.java").write_text(
+        "import auth.Login;\npublic class App { Login login; }\n"
+    )
+    files = sorted(tmp_path.glob("*.java"))
+
+    parser = JavaParser()
+    graph = parser.parse(files, tmp_path)
+
+    assert "auth.Login" in graph.entities
+    assert graph.entities["auth.Login"].package == "auth"
+    assert "auth" in graph.packages
+    edge_tuples = {(e.source, e.target, e.relation) for e in graph.edges}
+    assert ("App", "auth.Login", "import") in edge_tuples
+
+
 def test_java_parser_ignores_javadoc_only_and_unused_imports(tmp_path):
     """Issue #47: only imports referenced in code produce edges (no phantom cycles)."""
     src = tmp_path / "src"
