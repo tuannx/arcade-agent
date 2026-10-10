@@ -53,6 +53,7 @@ jobs:
       # Analyze the checked-out source, not a released package that lags this PR.
       arcade-agent-version: "source"
       filter-non-architectural-helpers: true
+      post-pr-comment: ${{ github.repository != 'tuannx/arcade-agent' }}
     secrets: inherit
 
   package:
