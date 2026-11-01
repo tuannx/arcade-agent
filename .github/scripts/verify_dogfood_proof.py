@@ -18,16 +18,10 @@ from pathlib import Path
 from typing import Any
 
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
-REPLAY_FIELDS = (
-    "num_entities",
-    "num_edges",
-    "num_components",
-    "component_dependencies",
-    "metrics",
-    "derived_metrics",
-    "principle_signals",
-    "smells",
-)
+# Timestamp is generated independently on each runner; ref is CI-context
+# metadata rather than a property of the analyzed source. All remaining JSON
+# fields must match, including components, graph details and score drivers.
+VOLATILE_REPLAY_FIELDS = frozenset({"timestamp", "ref"})
 
 
 class VerificationError(ValueError):
@@ -156,15 +150,18 @@ def verify_bundle(
     _require_equal(proof.get("smells_count_heuristic"), len(analysis.get("smells", [])),
                    "proof.smells_count_heuristic")
 
-    for key in REPLAY_FIELDS:
-        _require_equal(replay.get(key), analysis.get(key), f"replay.{key}")
+    replay_fields = sorted((set(analysis) | set(replay)) - VOLATILE_REPLAY_FIELDS)
+    for key in replay_fields:
+        if key not in analysis or key not in replay:
+            raise VerificationError(f"replay.{key}: missing deterministic field")
+        _require_equal(replay[key], analysis[key], f"replay.{key}")
 
     return {
         "status": "verified-replay-and-artifact-integrity",
         "target_repository": expected_repo,
         "source_sha": expected_source_sha,
         "analyzer_sha": expected_analyzer_sha,
-        "replay_fields_compared": list(REPLAY_FIELDS),
+        "replay_fields_compared": replay_fields,
         "screenshot_dimensions": {"width": width, "height": height},
         "analysis_sha256": hashlib.sha256(analysis_path.read_bytes()).hexdigest(),
         "screenshot_sha256": hashlib.sha256(screenshot_path.read_bytes()).hexdigest(),
