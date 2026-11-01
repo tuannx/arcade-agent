@@ -552,7 +552,19 @@ def link(facts: list[FileFacts]) -> DependencyGraph:
             seen.add(key)
             unique_edges.append(edge)
 
-    return DependencyGraph(entities=entities, edges=unique_edges, packages=packages)
+    # This linker resolves imports and inheritance only. It does not build
+    # intra-module or method call edges, so sparse internal edges cannot
+    # establish whether functions in a large Python component are unrelated.
+    # Both full and incremental parsing use this link() function.
+    return DependencyGraph(
+        entities=entities,
+        edges=unique_edges,
+        packages=packages,
+        metadata={"relation_coverage": {"python": {
+            "collected_relations": ["extends", "import"],
+            "call_coverage": "not_collected",
+        }}},
+    )
 
 
 @register_parser
