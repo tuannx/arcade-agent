@@ -5,6 +5,9 @@ on:
     paths:
       - 'src/arcade_agent/ci/**'
       - 'src/arcade_agent/algorithms/concern.py'
+      - 'src/arcade_agent/algorithms/coupling.py'
+      - 'src/arcade_agent/algorithms/smells.py'
+      - 'tests/test_algorithms/test_non_scoring_candidates.py'
       - 'src/arcade_agent/tools/detect_smells.py'
       - 'tests/test_algorithms/test_concern_scatter_evidence.py'
       - 'tests/test_source_provenance.py'
