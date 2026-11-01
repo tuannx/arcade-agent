@@ -43,3 +43,49 @@ def test_non_git_source_is_explicitly_local(tmp_path: Path) -> None:
 def test_invalid_pin_is_rejected(tmp_path: Path, sha: str) -> None:
     with pytest.raises(ValueError, match="exactly 40"):
         resolve_source_commit(tmp_path, expected_sha=sha)
+
+
+@pytest.fixture
+def committed_source(tmp_path: Path) -> tuple[Path, str]:
+    """Create a clean repository containing tracked analyzable source."""
+    source = tmp_path / "target"
+    source.mkdir()
+    _git(source, "init", "-q")
+    (source / "core.py").write_text("answer = 1\n")
+    _git(source, "add", "core.py")
+    _git(
+        source, "-c", "user.name=Test", "-c", "user.email=test@example.com",
+        "commit", "-m", "initial", "-q",
+    )
+    return source, _git(source, "rev-parse", "HEAD")
+
+
+def test_clean_pinned_source_is_accepted(committed_source: tuple[Path, str]) -> None:
+    source, sha = committed_source
+    assert resolve_source_commit(source, expected_sha=sha) == sha
+
+
+def test_pinned_source_rejects_modified_tracked_code(
+    committed_source: tuple[Path, str],
+) -> None:
+    source, sha = committed_source
+    (source / "core.py").write_text("answer = 999\n")
+    with pytest.raises(ValueError, match="worktree is dirty"):
+        resolve_source_commit(source, expected_sha=sha)
+
+
+def test_pinned_source_rejects_untracked_code(
+    committed_source: tuple[Path, str],
+) -> None:
+    source, sha = committed_source
+    (source / "extra.py").write_text("unexpected = True\n")
+    with pytest.raises(ValueError, match="worktree is dirty"):
+        resolve_source_commit(source, expected_sha=sha)
+
+
+def test_unpinned_dirty_source_is_not_rejected(
+    committed_source: tuple[Path, str],
+) -> None:
+    source, sha = committed_source
+    (source / "core.py").write_text("answer = 2\n")
+    assert resolve_source_commit(source) == sha
