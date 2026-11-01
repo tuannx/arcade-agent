@@ -380,8 +380,8 @@ def test_single_language_parse_preserves_python_call_coverage(fixtures_dir: Path
     direct = PythonParser().parse(sorted(root.rglob("*.py")), root)
     assert graph_to_dict(graph) == graph_to_dict(direct)
     assert graph.relation_coverage()["python"] == {
-        "collected_relations": ["extends", "import"],
-        "call_coverage": "not_collected",
+        "collected_relations": ["calls", "extends", "import"],
+        "call_coverage": "partial",
     }
     assert set(graph.metadata) == {"relation_coverage"}
 
