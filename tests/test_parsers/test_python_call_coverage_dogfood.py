@@ -32,13 +32,14 @@ def _derived_scores(architecture, graph, smells):
     return {metric.name: metric.value for metric in metrics}, signals
 
 
-def test_python_parser_explicitly_declares_uncollected_calls(tmp_path):
+def test_python_parser_declares_partial_call_coverage(tmp_path):
     _, graph = _real_python_graph(tmp_path)
     assert graph.relation_coverage()["python"] == {
-        "collected_relations": ["extends", "import"],
-        "call_coverage": "not_collected",
+        "collected_relations": ["calls", "extends", "import"],
+        "call_coverage": "partial",
     }
-    assert all(edge.relation in {"import", "extends"} for edge in graph.edges)
+    # The 26 fixture functions have no calls; capability is still declared partial.
+    assert all(edge.relation in {"import", "extends", "calls"} for edge in graph.edges)
 
 
 def test_sparse_python_tools_is_a_low_severity_coverage_warning(tmp_path):
