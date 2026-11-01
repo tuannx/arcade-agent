@@ -105,6 +105,7 @@ def detect_smells(
                 smells.append(SmellInstance(
                     smell_type=SmellType.CONCERN_OVERLOAD,
                     severity=overload["severity"],
+                    scoring_eligible=False,  # Missing call evidence is not a violation.
                     affected_components=[overload["component"]],
                     description=(
                         f"{overload['component']}: insufficient coverage for cohesion "
