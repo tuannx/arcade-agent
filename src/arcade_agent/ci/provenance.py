@@ -73,7 +73,9 @@ def resolve_analyzer_commit(
     if analyzer_source is None and expected_sha is None:
         return "unavailable"
     if analyzer_source is None or expected_sha is None:
-        raise ValueError("analyzer provenance requires both --analyzer-source and --expected-analyzer-sha")
+        raise ValueError(
+            "analyzer provenance requires both --analyzer-source and --expected-analyzer-sha"
+        )
 
     source = Path(analyzer_source).resolve()
     committed_package = source / "src" / "arcade_agent"

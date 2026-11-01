@@ -18,10 +18,10 @@ def analyzer_checkout(tmp_path: Path) -> tuple[Path, Path, str]:
     root = tmp_path / "source"
     package = root / "src" / "arcade_agent"
     package.mkdir(parents=True)
-    (root / "pyproject.toml").write_text('[project]\\nname = "arcade-agent"\\n')
-    (package / "__init__.py").write_text("__version__ = 'test'\\n")
+    (root / "pyproject.toml").write_text('[project]\nname = "arcade-agent"\n')
+    (package / "__init__.py").write_text("__version__ = 'test'\n")
     (package / "ci").mkdir()
-    (package / "ci" / "run_self_analysis.py").write_text("def main(): pass\\n")
+    (package / "ci" / "run_self_analysis.py").write_text("def main(): pass\n")
     git(root, "init", "-q")
     git(root, "add", ".")
     git(root, "-c", "user.name=Test", "-c", "user.email=test@example.com",
@@ -60,7 +60,7 @@ def test_wrong_checkout_sha_is_rejected(analyzer_checkout):
 
 def test_installed_package_mismatch_is_rejected(analyzer_checkout):
     root, installed, sha = analyzer_checkout
-    (installed / "ci" / "run_self_analysis.py").write_text("def main(): pass # tampered\\n")
+    (installed / "ci" / "run_self_analysis.py").write_text("def main(): pass # tampered\n")
     with pytest.raises(ValueError, match="differs"):
         resolve_analyzer_commit(root, sha, installed_package=installed)
 
@@ -74,7 +74,7 @@ def test_missing_installed_module_is_rejected(analyzer_checkout):
 
 def test_modified_checkout_is_rejected(analyzer_checkout):
     root, installed, sha = analyzer_checkout
-    (root / "src" / "arcade_agent" / "__init__.py").write_text("changed = True\\n")
+    (root / "src" / "arcade_agent" / "__init__.py").write_text("changed = True\n")
     with pytest.raises(ValueError, match="dirty"):
         resolve_analyzer_commit(root, sha, installed_package=installed)
 
