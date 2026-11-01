@@ -148,6 +148,11 @@ def detect_smells(
         # Heuristic: Scattered Parasitic Functionality
         scattered = detect_scattered_functionality(architecture, dep_graph)
         for item in scattered:
+            sample_entities = ", ".join(
+                match["entity"] for match in item["evidence"][:5]
+            )
+            if len(item["evidence"]) > 5:
+                sample_entities += f" (+{len(item['evidence']) - 5} more)"
             smells.append(SmellInstance(
                 smell_type=SmellType.SCATTERED_FUNCTIONALITY,
                 severity=item["severity"],
@@ -162,7 +167,8 @@ def detect_smells(
                     f"({', '.join(item['matched_suffixes'])}). "
                     "It is not a verified violation; the responsibilities may "
                     "correctly span multiple architectural layers. "
-                    "Review the matched entities and their dependency paths."
+                    f"Matching entity evidence: {sample_entities}. Review their "
+                    "dependency paths before treating this candidate as a defect."
                 ),
                 suggestion=(
                     f"Review '{item['pattern']}' responsibilities across the listed "
