@@ -17,6 +17,7 @@ from typing import Any
 from arcade_agent.algorithms.coupling import compute_balanced_scores, graph_quality_context
 from arcade_agent.algorithms.smells import SmellInstance
 from arcade_agent.ci.graph_filter import _filter_non_architectural_entities
+from arcade_agent.ci.provenance import resolve_source_commit
 from arcade_agent.exporters.json import build_component_summary, build_graph_summary
 from arcade_agent.tools.compute_metrics import compute_metrics
 from arcade_agent.tools.detect_smells import detect_smells
@@ -105,9 +106,18 @@ def main() -> None:
             "registration decorators. Leave disabled for generic repositories."
         ),
     )
+    parser.add_argument(
+        "--expected-source-sha",
+        default=None,
+        help="Require the analyzed source tree to be checked out at this full Git commit SHA",
+    )
     args = parser.parse_args()
 
     source = str(Path(args.source).resolve())
+    try:
+        source_commit = resolve_source_commit(source, args.expected_source_sha)
+    except ValueError as exc:
+        parser.error(str(exc))
     language = args.language or None
     languages = [part.strip() for part in args.languages.split(",") if part.strip()] or None
     exclude_dirs = [
@@ -175,8 +185,10 @@ def main() -> None:
         "repo_name": args.repo_name or repo.name,
         "language": repo.language or language,
         "languages": repo.languages,
-        "commit_sha": os.environ.get("GITHUB_SHA", "local"),
+        "commit_sha": source_commit,
         "ref": os.environ.get("GITHUB_REF", "local"),
+        "source_ref": f"commit:{source_commit}" if source_commit != "local" else "local",
+        "analyzer_commit_sha": os.environ.get("GITHUB_SHA", "local"),
         "algorithm": args.algorithm,
         "num_components": len(arch.components),
         "num_entities": graph.num_entities,
