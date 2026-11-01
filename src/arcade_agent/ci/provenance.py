@@ -6,7 +6,7 @@ import re
 import subprocess
 from pathlib import Path
 
-_FULL_SHA = re.compile(r"[0-9a-f]{40}\\Z")
+_FULL_SHA = re.compile(r"[0-9a-f]{40}")
 
 
 def resolve_source_commit(source: str | Path, expected_sha: str | None = None) -> str:
