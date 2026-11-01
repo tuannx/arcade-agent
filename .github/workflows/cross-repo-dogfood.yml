@@ -1,0 +1,148 @@
+name: Cross-Repository Dogfood Proof
+
+on:
+  pull_request:
+    paths:
+      - 'src/arcade_agent/ci/**'
+      - 'tests/test_source_provenance.py'
+      - '.github/workflows/cross-repo-dogfood.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  java-ha:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TARGET_REPOSITORY: tuannx/spring-boot-multi-region-ha
+      TARGET_SHA: 5a4ba4d33dfd88a90fd6ec749894fd0088baf1d9
+      TARGET_PATH: target-java
+      TARGET_LANGUAGE: java
+    steps:
+      - name: Checkout analyzer under review
+        uses: actions/checkout@v4
+        with:
+          path: analyzer
+
+      - name: Checkout pinned public Java HA repository
+        uses: actions/checkout@v4
+        with:
+          repository: tuannx/spring-boot-multi-region-ha
+          ref: 5a4ba4d33dfd88a90fd6ec749894fd0088baf1d9
+          path: target-java
+          persist-credentials: false
+
+      - name: Verify checkout identities
+        run: |
+          test "$(git -C target-java rev-parse HEAD)" = "$TARGET_SHA"
+          git -C analyzer rev-parse HEAD
+          git -C target-java rev-parse HEAD
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install analyzer from this PR
+        run: python -m pip install "./analyzer[languages]"
+
+      - name: Run pinned Java architecture analysis
+        id: analysis
+        run: |
+          arcade-self-analysis \
+            --source "$TARGET_PATH" \
+            --language "$TARGET_LANGUAGE" \
+            --repo-name "$TARGET_REPOSITORY" \
+            --expected-source-sha "$TARGET_SHA" \
+            --output-json java-ha-analysis.json \
+            --output-html java-ha-report.html
+
+      - name: Assert target Git provenance is not analyzer provenance
+        if: steps.analysis.outcome == 'success'
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          data = json.loads(Path("java-ha-analysis.json").read_text())
+          assert data["repo_name"] == os.environ["TARGET_REPOSITORY"]
+          assert data["commit_sha"] == os.environ["TARGET_SHA"]
+          assert data["analyzer_commit_sha"] == os.environ["GITHUB_SHA"]
+          assert data["source_ref"] == "commit:" + os.environ["TARGET_SHA"]
+          print("PASS: source and analyzer commit identities are distinct and correct")
+          print({key: data[key] for key in ("num_entities", "num_edges", "num_components")})
+          PY
+
+      - name: Capture screenshot from the actual generated report
+        id: screenshot
+        if: steps.analysis.outcome == 'success'
+        continue-on-error: true
+        run: |
+          python -m pip install playwright==1.56.0
+          python -m playwright install chromium
+          python - <<'PY'
+          from pathlib import Path
+          from playwright.sync_api import sync_playwright
+
+          with sync_playwright() as playwright:
+              browser = playwright.chromium.launch()
+              page = browser.new_page(viewport={"width": 1440, "height": 900})
+              page.goto(Path("java-ha-report.html").resolve().as_uri())
+              page.screenshot(path="java-ha-actual-screenshot.png", full_page=False)
+              browser.close()
+          image = Path("java-ha-actual-screenshot.png").read_bytes()
+          assert image.startswith(b"\\x89PNG\\r\\n\\x1a\\n") and len(image) > 2048
+          print("Screenshot captured from real report HTML")
+          PY
+
+      - name: Record reproducible evidence and gaps
+        if: always()
+        env:
+          ANALYSIS_OUTCOME: ${{ steps.analysis.outcome }}
+          SCREENSHOT_OUTCOME: ${{ steps.screenshot.outcome }}
+          CI_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          file = Path("java-ha-analysis.json")
+          data = json.loads(file.read_text()) if file.is_file() else {}
+          screenshot = Path("java-ha-actual-screenshot.png")
+          proof = {
+              "target_repository": os.environ["TARGET_REPOSITORY"],
+              "target_commit_sha_expected": os.environ["TARGET_SHA"],
+              "target_commit_sha_reported": data.get("commit_sha"),
+              "analyzer_commit_sha": data.get("analyzer_commit_sha", os.environ.get("GITHUB_SHA")),
+              "analysis_outcome": os.environ.get("ANALYSIS_OUTCOME", "not-run"),
+              "screenshot_outcome": os.environ.get("SCREENSHOT_OUTCOME", "not-run"),
+              "screenshot_sha256": hashlib.sha256(screenshot.read_bytes()).hexdigest() if screenshot.is_file() else None,
+              "num_entities": data.get("num_entities"),
+              "num_edges": data.get("num_edges"),
+              "num_components": data.get("num_components"),
+              "smells_count_heuristic": len(data.get("smells", [])) if data else None,
+              "false_positive_review": "not-evaluated",
+              "unsupported_construct_review": "not-evaluated",
+              "analysis_json_sha256": hashlib.sha256(file.read_bytes()).hexdigest() if file.is_file() else None,
+              "ci_url": os.environ["CI_URL"],
+          }
+          Path("dogfood-proof.json").write_text(json.dumps(proof, indent=2) + "\\n")
+          print(json.dumps(proof, indent=2))
+          PY
+
+      - name: Upload proof bundle even when analysis fails
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: java-ha-dogfood-proof
+          path: |
+            dogfood-proof.json
+            java-ha-analysis.json
+            java-ha-report.html
+            java-ha-actual-screenshot.png
+          retention-days: 30
+          if-no-files-found: warn
