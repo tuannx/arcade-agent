@@ -53,3 +53,18 @@ def test_nested_generator_and_destructured_targets_are_scoped(tmp_path):
         "    return [[helper() for value in group] for group in groups]\n"
     ))
     assert edges == {("app.unrelated", "app.helper")}
+
+
+def test_set_dict_and_multiple_clause_targets_are_scoped(tmp_path):
+    edges = _call_edges(tmp_path, (
+        "def helper():\n    return 1\n\n"
+        "def set_shadow(values):\n"
+        "    return {helper() for helper in values}\n\n"
+        "def dict_shadow(pairs):\n"
+        "    return {helper(): value for helper, value in pairs}\n\n"
+        "def second_clause(groups):\n"
+        "    return [helper() for group in groups for helper in group]\n\n"
+        "def set_real_call(values):\n"
+        "    return {helper() for value in values}\n"
+    ))
+    assert edges == {("app.set_real_call", "app.helper")}
