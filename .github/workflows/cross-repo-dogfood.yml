@@ -11,6 +11,8 @@ on:
       - 'src/arcade_agent/tools/detect_smells.py'
       - 'tests/test_algorithms/test_concern_scatter_evidence.py'
       - 'tests/test_source_provenance.py'
+      - '.github/scripts/verify_dogfood_proof.py'
+      - 'tests/test_verify_dogfood_proof.py'
       - '.github/workflows/cross-repo-dogfood.yml'
   workflow_dispatch:
 
@@ -127,6 +129,7 @@ jobs:
               "analysis_outcome": os.environ.get("ANALYSIS_OUTCOME", "not-run"),
               "screenshot_outcome": os.environ.get("SCREENSHOT_OUTCOME", "not-run"),
               "screenshot_sha256": hashlib.sha256(screenshot.read_bytes()).hexdigest() if screenshot.is_file() else None,
+              "html_report_sha256": hashlib.sha256(Path("java-ha-report.html").read_bytes()).hexdigest() if Path("java-ha-report.html").is_file() else None,
               "num_entities": data.get("num_entities"),
               "num_edges": data.get("num_edges"),
               "num_components": data.get("num_components"),
@@ -253,6 +256,7 @@ jobs:
               "screenshot_outcome": "success" if screenshot.is_file() else "failed-or-not-run",
               "analysis_json_sha256": hashlib.sha256(report.read_bytes()).hexdigest() if report.is_file() else None,
               "screenshot_sha256": hashlib.sha256(screenshot.read_bytes()).hexdigest() if screenshot.is_file() else None,
+              "html_report_sha256": hashlib.sha256(Path("python-examples-report.html").read_bytes()).hexdigest() if Path("python-examples-report.html").is_file() else None,
               "num_entities": data.get("num_entities"),
               "num_edges": data.get("num_edges"),
               "num_components": data.get("num_components"),
@@ -279,5 +283,121 @@ jobs:
             python-examples-analysis.json
             python-examples-report.html
             python-examples-actual-screenshot.png
+          retention-days: 30
+          if-no-files-found: warn
+
+  # Independent verifier runs on a separate clean runner. It downloads the
+  # producer artifact and reruns the analyzer from a fresh pinned checkout.
+  # The verifier never treats heuristic warnings as confirmed violations.
+  verify-proofs:
+    needs: [java-ha, python-examples]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - corpus: java
+            artifact: java-ha-dogfood-proof
+            repository: tuannx/spring-boot-multi-region-ha
+            sha: 5a4ba4d33dfd88a90fd6ec749894fd0088baf1d9
+            checkout_path: target-java
+            source_path: target-java
+            language: java
+            proof: dogfood-proof.json
+            report: java-ha-analysis.json
+            html: java-ha-report.html
+            screenshot: java-ha-actual-screenshot.png
+          - corpus: python
+            artifact: python-examples-dogfood-proof
+            repository: tuannx/arcade-agent-examples
+            sha: 067be3a83a5e58d4d4a8a72ef578e7f7fa588209
+            checkout_path: target-examples
+            source_path: target-examples/scenarios/synthetic-smells/synthetic/after
+            language: python
+            proof: python-examples-proof.json
+            report: python-examples-analysis.json
+            html: python-examples-report.html
+            screenshot: python-examples-actual-screenshot.png
+    steps:
+      - name: Independently checkout analyzer under review
+        uses: actions/checkout@v4
+        with:
+          path: analyzer
+          persist-credentials: false
+
+      - name: Independently checkout the pinned source repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ matrix.repository }}
+          ref: ${{ matrix.sha }}
+          path: ${{ matrix.checkout_path }}
+          persist-credentials: false
+
+      - name: Verify replay checkout provenance
+        env:
+          EXPECTED_SHA: ${{ matrix.sha }}
+          CHECKOUT_PATH: ${{ matrix.checkout_path }}
+        run: |
+          test "$(git -C "$CHECKOUT_PATH" rev-parse HEAD)" = "$EXPECTED_SHA"
+          test -z "$(git -C "$CHECKOUT_PATH" status --porcelain --untracked-files=all)"
+
+      - name: Download producer artifacts to a separate runner
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: producer-proof
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install same analyzer from pinned PR checkout
+        run: python -m pip install "./analyzer[languages]"
+
+      - name: Replay actual analyzer against independent source checkout
+        env:
+          SOURCE_PATH: ${{ matrix.source_path }}
+          SOURCE_LANGUAGE: ${{ matrix.language }}
+          TARGET_REPOSITORY: ${{ matrix.repository }}
+          TARGET_SHA: ${{ matrix.sha }}
+        run: |
+          arcade-self-analysis \
+            --source "$SOURCE_PATH" \
+            --language "$SOURCE_LANGUAGE" \
+            --repo-name "$TARGET_REPOSITORY" \
+            --expected-source-sha "$TARGET_SHA" \
+            --output-json independent-replay.json \
+            --output-html independent-replay.html
+
+      - name: Independently verify artifact hashes, commit SHA and replay
+        env:
+          TARGET_REPOSITORY: ${{ matrix.repository }}
+          TARGET_SHA: ${{ matrix.sha }}
+          PROOF: ${{ matrix.proof }}
+          REPORT: ${{ matrix.report }}
+          HTML: ${{ matrix.html }}
+          SCREENSHOT: ${{ matrix.screenshot }}
+        run: |
+          python analyzer/.github/scripts/verify_dogfood_proof.py \
+            --proof "producer-proof/$PROOF" \
+            --analysis "producer-proof/$REPORT" \
+            --html "producer-proof/$HTML" \
+            --screenshot "producer-proof/$SCREENSHOT" \
+            --replay independent-replay.json \
+            --expected-repo "$TARGET_REPOSITORY" \
+            --expected-source-sha "$TARGET_SHA" \
+            --expected-analyzer-sha "$GITHUB_SHA" \
+            --output verifier-result.json
+
+      - name: Preserve independent verifier results and replay
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: independent-verify-${{ matrix.corpus }}
+          path: |
+            verifier-result.json
+            independent-replay.json
           retention-days: 30
           if-no-files-found: warn
