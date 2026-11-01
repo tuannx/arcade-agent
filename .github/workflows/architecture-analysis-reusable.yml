@@ -163,6 +163,7 @@ jobs:
           REPO_NAME: ${{ inputs.repo-name }}
           PRIMARY_ALGORITHM: ${{ inputs.primary-algorithm }}
           FILTER_NON_ARCHITECTURAL_HELPERS: ${{ inputs.filter-non-architectural-helpers }}
+          ARCADE_AGENT_VERSION: ${{ inputs.arcade-agent-version }}
         run: |
           ARGS=(--source "target-repo/${SOURCE_PATH}")
           if [ -n "${LANGUAGES}" ]; then
@@ -181,6 +182,9 @@ jobs:
           fi
           if [ "${FILTER_NON_ARCHITECTURAL_HELPERS}" = "true" ]; then
             ARGS+=(--filter-non-architectural-helpers)
+          fi
+          if [ "${ARCADE_AGENT_VERSION}" = "source" ]; then
+            ARGS+=(--analyzer-source target-repo --expected-analyzer-sha "$(git -C target-repo rev-parse HEAD)")
           fi
           arcade-self-analysis \
             "${ARGS[@]}" \
@@ -199,6 +203,7 @@ jobs:
           REPO_NAME: ${{ inputs.repo-name }}
           WCA_NUM_CLUSTERS: ${{ inputs.wca-num-clusters }}
           FILTER_NON_ARCHITECTURAL_HELPERS: ${{ inputs.filter-non-architectural-helpers }}
+          ARCADE_AGENT_VERSION: ${{ inputs.arcade-agent-version }}
         run: |
           ARGS=(--source "target-repo/${SOURCE_PATH}")
           if [ -n "${LANGUAGES}" ]; then
@@ -218,11 +223,17 @@ jobs:
           if [ "${FILTER_NON_ARCHITECTURAL_HELPERS}" = "true" ]; then
             ARGS+=(--filter-non-architectural-helpers)
           fi
+          if [ "${ARCADE_AGENT_VERSION}" = "source" ]; then
+            ARGS+=(--analyzer-source target-repo --expected-analyzer-sha "$(git -C target-repo rev-parse HEAD)")
+          fi
           arcade-self-analysis \
             "${ARGS[@]}" \
             --algorithm acdc \
             --output-json arcade_analysis_acdc.json \
             --output-html arcade_analysis_acdc.html
+          if [ "${ARCADE_AGENT_VERSION}" = "source" ]; then
+            ARGS+=(--analyzer-source target-repo --expected-analyzer-sha "$(git -C target-repo rev-parse HEAD)")
+          fi
           arcade-self-analysis \
             "${ARGS[@]}" \
             --algorithm wca \
