@@ -156,6 +156,7 @@ def detect_smells(
             smells.append(SmellInstance(
                 smell_type=SmellType.SCATTERED_FUNCTIONALITY,
                 severity=item["severity"],
+                scoring_eligible=False,  # Naming-only candidate; no score penalty.
                 affected_components=item["components"],
                 description=(
                     f"Possible '{item['pattern']}' concern by naming across "
