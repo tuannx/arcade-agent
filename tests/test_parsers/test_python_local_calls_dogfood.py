@@ -82,7 +82,7 @@ def test_incremental_cache_replays_calls_and_invalidates_when_source_changes(tmp
     assert cache.stats["reused"] >= 1
     assert first.to_edge_tuples() == second.to_edge_tuples()
     assert ("app.run", "app.helper", "calls") in second.to_edge_tuples()
-    source.write_text(source.read_text().replace("helper()", "1"), encoding="utf-8")
+    source.write_text(source.read_text().replace("return helper()", "return 1"), encoding="utf-8")
     after = parser.parse_incremental([source], tmp_path, cache)
     assert ("app.run", "app.helper", "calls") not in after.to_edge_tuples()
     assert after.to_edge_tuples() == parser.parse([source], tmp_path).to_edge_tuples()
