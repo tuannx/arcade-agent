@@ -153,17 +153,21 @@ def detect_smells(
                 severity=item["severity"],
                 affected_components=item["components"],
                 description=(
-                    f"'{item['pattern']}' pattern is scattered across "
+                    f"Possible '{item['pattern']}' concern by naming across "
                     f"{item['count']} components: {', '.join(item['components'])}"
                 ),
                 explanation=(
-                    "When a single concern is spread across many components, changes "
-                    "to that concern require modifying multiple places, increasing "
-                    "the risk of inconsistencies and bugs."
+                    "This is a naming-only heuristic: entities share the specific "
+                    f"'{item['pattern']}' stem in different roles "
+                    f"({', '.join(item['matched_suffixes'])}). "
+                    "It is not a verified violation; the responsibilities may "
+                    "correctly span multiple architectural layers. "
+                    "Review the matched entities and their dependency paths."
                 ),
                 suggestion=(
-                    f"Centralize '{item['pattern']}'-related functionality into a "
-                    f"dedicated component to reduce scattering."
+                    f"Review '{item['pattern']}' responsibilities across the listed "
+                    "components and architectural intent before considering any "
+                    "consolidation or refactor."
                 ),
             ))
 
