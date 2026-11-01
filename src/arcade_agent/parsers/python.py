@@ -271,6 +271,64 @@ def _extract_referenced_names(node) -> set[str]:
             stack.append(child)
     return names
 
+
+def _binding_names(node) -> set[str]:
+    """Conservatively recognize local assignment and destructuring targets."""
+    if node is None:
+        return set()
+    if node.type == "identifier":
+        return {_get_text(node)}
+    if node.type in ("tuple_pattern", "list_pattern", "pattern_list", "parenthesized_expression"):
+        names: set[str] = set()
+        for child in node.children:
+            names.update(_binding_names(child))
+        return names
+    return set()
+
+
+def _extract_unqualified_calls(node) -> set[str]:
+    """Find only bare calls in a top-level function body, not nested scopes.
+
+    This is a *partial* static signal. Exclude names potentially shadowed by
+    parameters, local bindings, or local imports. Attribute/dynamic calls and
+    decorators are not mapped as call edges; runtime dispatch is unknown.
+    """
+    actual = _unwrap_decorated(node)
+    if actual.type != "function_definition":
+        return set()
+    body = actual.child_by_field_name("body")
+    if body is None:
+        return set()
+
+    shadowed: set[str] = set()
+    params = actual.child_by_field_name("parameters")
+    if params is not None:
+        shadowed.update(_get_text(n) for n in _collect_nodes(params, "identifier"))
+    calls: set[str] = set()
+    stack = [body]
+    while stack:
+        current = stack.pop()
+        if current.type in ("function_definition", "class_definition", "lambda"):
+            name = current.child_by_field_name("name")
+            if name is not None:
+                shadowed.add(_get_text(name))
+            # Never attribute a nested function or closure body to this caller.
+            continue
+        if current.type == "call":
+            callee = current.child_by_field_name("function")
+            if callee is not None and callee.type == "identifier":
+                calls.add(_get_text(callee))
+        if current.type in (
+            "assignment", "augmented_assignment", "named_expression", "for_statement",
+        ):
+            shadowed.update(_binding_names(current.child_by_field_name("left")))
+        if current.type in ("import_statement", "import_from_statement",
+                            "global_statement", "nonlocal_statement"):
+            # Over-approximation is safer than a false local call edge.
+            shadowed.update(_get_text(n) for n in _collect_nodes(current, "identifier"))
+        stack.extend(current.children)
+    return calls - shadowed
+
 def _extract_module_variables(root_node) -> list[str]:
     """Names bound by top-level assignments (``db = SQLAlchemy()``, ``X: int = 1``)."""
     names: list[str] = []
@@ -315,6 +373,7 @@ class FileFacts:
     file_imports: list[dict] = field(default_factory=list)      # shared by entities in the file
     refs: dict[str, set[str]] = field(default_factory=dict)     # fqn -> referenced names
     module_vars: list[str] = field(default_factory=list)        # top-level assignment names
+    calls: dict[str, set[str]] = field(default_factory=dict)     # local bare call candidates
 
 
 _PARSER: Parser | None = None
@@ -358,6 +417,7 @@ def extract_file(py_file: Path, root: Path) -> FileFacts | None:
 
     entities: dict[str, Entity] = {}
     refs_map: dict[str, set[str]] = {}
+    calls_map: dict[str, set[str]] = {}
 
     if not all_decls:
         fqn = module_name
@@ -383,10 +443,12 @@ def extract_file(py_file: Path, root: Path) -> FileFacts | None:
                 properties={"owner": owner_fqn} if owner_fqn else {},
             )
             refs_map[fqn] = refs
+            if decl["kind"] == "function":
+                calls_map[fqn] = _extract_unqualified_calls(decl["node"])
 
     return FileFacts(rel_path=rel_path, package=package, entities=entities,
                      file_imports=file_imports, refs=refs_map,
-                     module_vars=_extract_module_variables(root_node))
+                     module_vars=_extract_module_variables(root_node), calls=calls_map)
 
 
 def _module_of(rel_path: str) -> str:
@@ -544,6 +606,25 @@ def link(facts: list[FileFacts]) -> DependencyGraph:
             if target is not None:
                 edges.append(Edge(source=fqn, target=target, relation="extends"))
 
+
+    # Bind only direct calls to an unshadowed function *defined in the same
+    # source module*. No short-name guesses across imports or class methods.
+    for ff in facts:
+        module_name = _module_of(ff.rel_path)
+        shadowed = set(ff.module_vars)
+        for imp in ff.file_imports:
+            if imp["names"]:
+                shadowed.update(imp.get("aliases", {}).get(name, name) for name in imp["names"])
+            else:
+                shadowed.add(imp["module"].split(".", 1)[0])
+        for caller, names in ff.calls.items():
+            for name in sorted(names):
+                if name in shadowed:
+                    continue
+                target = f"{module_name}.{name}" if module_name else name
+                if target != caller and target in entities and entities[target].kind == "function":
+                    edges.append(Edge(source=caller, target=target, relation="calls"))
+
     seen: set[tuple[str, str, str]] = set()
     unique_edges: list[Edge] = []
     for edge in edges:
@@ -552,17 +633,15 @@ def link(facts: list[FileFacts]) -> DependencyGraph:
             seen.add(key)
             unique_edges.append(edge)
 
-    # This linker resolves imports and inheritance only. It does not build
-    # intra-module or method call edges, so sparse internal edges cannot
-    # establish whether functions in a large Python component are unrelated.
-    # Both full and incremental parsing use this link() function.
+    # Bare same-module calls are only a conservative subset. Other call sites
+    # are unresolved, so cohesion analysis must not treat this as complete.
     return DependencyGraph(
         entities=entities,
         edges=unique_edges,
         packages=packages,
         metadata={"relation_coverage": {"python": {
-            "collected_relations": ["extends", "import"],
-            "call_coverage": "not_collected",
+            "collected_relations": ["calls", "extends", "import"],
+            "call_coverage": "partial",
         }}},
     )
 
