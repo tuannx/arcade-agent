@@ -93,7 +93,7 @@ jobs:
               page.screenshot(path="java-ha-actual-screenshot.png", full_page=False)
               browser.close()
           image = Path("java-ha-actual-screenshot.png").read_bytes()
-          assert image.startswith(b"\\x89PNG\\r\\n\\x1a\\n") and len(image) > 2048
+          assert image.startswith(b"\x89PNG\r\n\x1a\n") and len(image) > 2048
           print("Screenshot captured from real report HTML")
           PY
 
@@ -130,7 +130,7 @@ jobs:
               "analysis_json_sha256": hashlib.sha256(file.read_bytes()).hexdigest() if file.is_file() else None,
               "ci_url": os.environ["CI_URL"],
           }
-          Path("dogfood-proof.json").write_text(json.dumps(proof, indent=2) + "\\n")
+          Path("dogfood-proof.json").write_text(json.dumps(proof, indent=2) + "\n")
           print(json.dumps(proof, indent=2))
           PY
 
