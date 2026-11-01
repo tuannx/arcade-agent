@@ -102,4 +102,5 @@ def test_report_is_explicitly_a_candidate_not_verified_violation():
     assert findings[0].severity == "low"
     assert "possible" in findings[0].description.lower()
     assert "naming-only" in findings[0].explanation.lower()
+    assert "example.billing.AuditService" in findings[0].explanation
     assert "review" in findings[0].suggestion.lower()
