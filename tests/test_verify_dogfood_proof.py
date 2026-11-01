@@ -42,6 +42,8 @@ def bundle(tmp_path):
         "component_dependencies": [{"source": "A", "target": "B"}],
         "metrics": {"RCI": 0.5}, "derived_metrics": {"BalancedArchitectureScore": 0.6},
         "principle_signals": {"LayeringHealth": 1}, "smells": [],
+        "components": [{"name": "core", "entities": ["A", "B"]}],
+        "score_drivers": {"naming_penalty": 0},
     }
     paths = {name: tmp_path / name for name in (
         "proof.json", "analysis.json", "report.html", "report.png", "replay.json",
@@ -125,4 +127,36 @@ def test_missing_replay_fails_closed(bundle):
 def test_html_tampering_fails(bundle):
     bundle["report.html"].write_text("<html>altered</html>")
     with pytest.raises(verifier.VerificationError, match="HTML report: SHA-256 mismatch"):
+        run(bundle)
+
+
+def _rewrite_analysis_and_manifest(bundle, transform):
+    """Simulate tampering with a matching producer-created hash manifest."""
+    analysis = json.loads(bundle["analysis.json"].read_text())
+    transform(analysis)
+    bundle["analysis.json"].write_text(json.dumps(analysis))
+    proof = json.loads(bundle["proof.json"].read_text())
+    proof["analysis_json_sha256"] = hashlib.sha256(bundle["analysis.json"].read_bytes()).hexdigest()
+    bundle["proof.json"].write_text(json.dumps(proof))
+
+
+def test_components_tampering_with_updated_hash_rejected(bundle):
+    _rewrite_analysis_and_manifest(
+        bundle, lambda payload: payload["components"][0].update(entities=["different"])
+    )
+    with pytest.raises(verifier.VerificationError, match="replay.components"):
+        run(bundle)
+
+
+def test_score_drivers_tampering_with_updated_hash_rejected(bundle):
+    _rewrite_analysis_and_manifest(
+        bundle, lambda payload: payload["score_drivers"].update(naming_penalty=999)
+    )
+    with pytest.raises(verifier.VerificationError, match="replay.score_drivers"):
+        run(bundle)
+
+
+def test_missing_component_field_with_updated_hash_rejected(bundle):
+    _rewrite_analysis_and_manifest(bundle, lambda payload: payload.pop("components"))
+    with pytest.raises(verifier.VerificationError, match="replay.components"):
         run(bundle)
