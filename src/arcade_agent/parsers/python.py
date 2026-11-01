@@ -326,6 +326,27 @@ def _match_capture_names(node) -> set[str]:
     return captured
 
 
+
+_COMPREHENSION_TYPES = {
+    "list_comprehension", "set_comprehension",
+    "dictionary_comprehension", "generator_expression",
+}
+
+
+def _comprehension_targets(node) -> frozenset[str]:
+    """Collect loop targets in this comprehension only, not nested ones.
+
+    Python 3 comprehensions have their own binding scope. Scope resolution
+    for a call inside the comprehension cannot use the surrounding function's
+    call candidates alone.
+    """
+    names: set[str] = set()
+    for child in node.named_children:
+        if child.type == "for_in_clause":
+            names.update(_binding_names(child.child_by_field_name("left")))
+    return frozenset(names)
+
+
 def _extract_unqualified_calls(node) -> set[str]:
     """Find only bare calls in a top-level function body, not nested scopes.
 
@@ -345,9 +366,13 @@ def _extract_unqualified_calls(node) -> set[str]:
     if params is not None:
         shadowed.update(_get_text(n) for n in _collect_nodes(params, "identifier"))
     calls: set[str] = set()
-    stack = [body]
+    # Carry comprehension-local names on the traversal stack. Do not add them
+    # to the enclosing function's shadowed set: those targets do not leak.
+    stack = [(body, frozenset())]
     while stack:
-        current = stack.pop()
+        current, scoped = stack.pop()
+        if current.type in _COMPREHENSION_TYPES:
+            scoped = scoped | _comprehension_targets(current)
         if current.type in ("function_definition", "class_definition", "lambda"):
             name = current.child_by_field_name("name")
             if name is not None:
@@ -357,7 +382,9 @@ def _extract_unqualified_calls(node) -> set[str]:
         if current.type == "call":
             callee = current.child_by_field_name("function")
             if callee is not None and callee.type == "identifier":
-                calls.add(_get_text(callee))
+                name = _get_text(callee)
+                if name not in scoped:
+                    calls.add(name)
         if current.type in ("assignment", "augmented_assignment", "for_statement"):
             shadowed.update(_binding_names(current.child_by_field_name("left")))
         elif current.type == "named_expression":
@@ -376,7 +403,7 @@ def _extract_unqualified_calls(node) -> set[str]:
                             "global_statement", "nonlocal_statement"):
             # Over-approximation is safer than a false local call edge.
             shadowed.update(_get_text(n) for n in _collect_nodes(current, "identifier"))
-        stack.extend(current.children)
+        stack.extend((child, scoped) for child in current.children)
     return calls - shadowed
 
 def _extract_module_variables(root_node) -> list[str]:
