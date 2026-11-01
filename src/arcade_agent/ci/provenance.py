@@ -56,3 +56,47 @@ def resolve_source_commit(source: str | Path, expected_sha: str | None = None) -
         if status.stdout.strip():
             raise ValueError("pinned source worktree is dirty (tracked or untracked changes)")
     return actual
+
+def resolve_analyzer_commit(
+    analyzer_source: str | Path | None = None,
+    expected_sha: str | None = None,
+    *,
+    installed_package: str | Path | None = None,
+) -> str:
+    """Attest analyzer checkout HEAD and the Python package actually imported.
+
+    A non-editable pip install is not within a Git checkout. An explicit pinned
+    checkout and byte equality check prevent a hosting runner's GITHUB_SHA from
+    being mislabeled as the actual analyzer source commit. This only attests
+    Python package files, not external/native dependencies or the environment.
+    """
+    if analyzer_source is None and expected_sha is None:
+        return "unavailable"
+    if analyzer_source is None or expected_sha is None:
+        raise ValueError(
+            "analyzer provenance requires both --analyzer-source and --expected-analyzer-sha"
+        )
+
+    source = Path(analyzer_source).resolve()
+    committed_package = source / "src" / "arcade_agent"
+    runtime_package = (
+        Path(installed_package).resolve()
+        if installed_package is not None
+        else Path(__file__).resolve().parents[1]
+    )
+    if not (source / "pyproject.toml").is_file() or not committed_package.is_dir():
+        raise ValueError("analyzer source is not an arcade-agent source checkout")
+
+    commit = resolve_source_commit(source, expected_sha)
+
+    def python_files(root: Path) -> dict[str, bytes]:
+        return {str(path.relative_to(root)): path.read_bytes() for path in root.rglob("*.py")}
+
+    try:
+        committed = python_files(committed_package)
+        installed = python_files(runtime_package)
+    except OSError as exc:
+        raise ValueError("cannot verify installed analyzer Python package") from exc
+    if not committed or committed != installed:
+        raise ValueError("installed analyzer Python package differs from pinned source checkout")
+    return commit

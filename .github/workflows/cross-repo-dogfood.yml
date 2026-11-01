@@ -66,6 +66,8 @@ jobs:
             --language "$TARGET_LANGUAGE" \
             --repo-name "$TARGET_REPOSITORY" \
             --expected-source-sha "$TARGET_SHA" \
+            --analyzer-source analyzer \
+            --expected-analyzer-sha "$(git -C analyzer rev-parse HEAD)" \
             --output-json java-ha-analysis.json \
             --output-html java-ha-report.html
 
@@ -80,7 +82,7 @@ jobs:
           data = json.loads(Path("java-ha-analysis.json").read_text())
           assert data["repo_name"] == os.environ["TARGET_REPOSITORY"]
           assert data["commit_sha"] == os.environ["TARGET_SHA"]
-          assert data["analyzer_commit_sha"] == os.environ["GITHUB_SHA"]
+          assert data["analyzer_commit_sha"] == __import__("subprocess").check_output(["git", "-C", "analyzer", "rev-parse", "HEAD"], text=True).strip()
           assert data["source_ref"] == "commit:" + os.environ["TARGET_SHA"]
           print("PASS: source and analyzer commit identities are distinct and correct")
           print({key: data[key] for key in ("num_entities", "num_edges", "num_components")})
@@ -128,7 +130,7 @@ jobs:
               "target_repository": os.environ["TARGET_REPOSITORY"],
               "target_commit_sha_expected": os.environ["TARGET_SHA"],
               "target_commit_sha_reported": data.get("commit_sha"),
-              "analyzer_commit_sha": data.get("analyzer_commit_sha", os.environ.get("GITHUB_SHA")),
+              "analyzer_commit_sha": data.get("analyzer_commit_sha", "unavailable"),
               "analysis_outcome": os.environ.get("ANALYSIS_OUTCOME", "not-run"),
               "screenshot_outcome": os.environ.get("SCREENSHOT_OUTCOME", "not-run"),
               "screenshot_sha256": hashlib.sha256(screenshot.read_bytes()).hexdigest() if screenshot.is_file() else None,
@@ -199,6 +201,8 @@ jobs:
             --language python \
             --repo-name "$TARGET_REPOSITORY" \
             --expected-source-sha "$TARGET_SHA" \
+            --analyzer-source analyzer \
+            --expected-analyzer-sha "$(git -C analyzer rev-parse HEAD)" \
             --output-json python-examples-analysis.json \
             --output-html python-examples-report.html
 
@@ -213,7 +217,7 @@ jobs:
           assert data["repo_name"] == os.environ["TARGET_REPOSITORY"]
           assert data["commit_sha"] == os.environ["TARGET_SHA"]
           assert data["source_ref"] == "commit:" + os.environ["TARGET_SHA"]
-          assert data["analyzer_commit_sha"] == os.environ["GITHUB_SHA"]
+          assert data["analyzer_commit_sha"] == __import__("subprocess").check_output(["git", "-C", "analyzer", "rev-parse", "HEAD"], text=True).strip()
           assert data["num_entities"] > 0
           assert data["num_components"] > 0
           print({key: data[key] for key in ("num_entities", "num_edges", "num_components")})
@@ -254,7 +258,7 @@ jobs:
               "target_repository": os.environ["TARGET_REPOSITORY"],
               "target_commit_sha_expected": os.environ["TARGET_SHA"],
               "target_commit_sha_reported": data.get("commit_sha"),
-              "analyzer_commit_sha": data.get("analyzer_commit_sha", os.environ.get("GITHUB_SHA")),
+              "analyzer_commit_sha": data.get("analyzer_commit_sha", "unavailable"),
               "analysis_outcome": "success" if data else "failed-or-not-run",
               "screenshot_outcome": "success" if screenshot.is_file() else "failed-or-not-run",
               "analysis_json_sha256": hashlib.sha256(report.read_bytes()).hexdigest() if report.is_file() else None,
@@ -371,6 +375,8 @@ jobs:
             --language "$SOURCE_LANGUAGE" \
             --repo-name "$TARGET_REPOSITORY" \
             --expected-source-sha "$TARGET_SHA" \
+            --analyzer-source analyzer \
+            --expected-analyzer-sha "$(git -C analyzer rev-parse HEAD)" \
             --output-json independent-replay.json \
             --output-html independent-replay.html
 
@@ -391,7 +397,7 @@ jobs:
             --replay independent-replay.json \
             --expected-repo "$TARGET_REPOSITORY" \
             --expected-source-sha "$TARGET_SHA" \
-            --expected-analyzer-sha "$GITHUB_SHA" \
+            --expected-analyzer-sha "$(git -C analyzer rev-parse HEAD)" \
             --output verifier-result.json
 
       - name: Preserve independent verifier results and replay
