@@ -276,8 +276,11 @@ def _binding_names(node) -> set[str]:
     """Conservatively recognize local assignment and destructuring targets."""
     if node is None:
         return set()
-    if node.type == "identifier":
-        return {_get_text(node)}
+    if node.type in ("identifier", "as_pattern_target"):
+        # Tree-sitter wraps `with resource as name` in as_pattern_target.
+        # Only a simple identifier is a local binding, never an attribute.
+        name = _get_text(node)
+        return {name} if name.isidentifier() else set()
     if node.type in ("tuple_pattern", "list_pattern", "pattern_list", "parenthesized_expression"):
         names: set[str] = set()
         for child in node.children:
@@ -318,10 +321,15 @@ def _extract_unqualified_calls(node) -> set[str]:
             callee = current.child_by_field_name("function")
             if callee is not None and callee.type == "identifier":
                 calls.add(_get_text(callee))
-        if current.type in (
-            "assignment", "augmented_assignment", "named_expression", "for_statement",
-        ):
+        if current.type in ("assignment", "augmented_assignment", "for_statement"):
             shadowed.update(_binding_names(current.child_by_field_name("left")))
+        elif current.type == "named_expression":
+            # `name := value` uses the `name` field, not `left`.
+            shadowed.update(_binding_names(current.child_by_field_name("name")))
+        elif current.type in ("as_pattern", "except_clause"):
+            # `with ... as name` and `except Error as name` bind locally.
+            # Do not link their calls to a same-named module function.
+            shadowed.update(_binding_names(current.child_by_field_name("alias")))
         if current.type in ("import_statement", "import_from_statement",
                             "global_statement", "nonlocal_statement"):
             # Over-approximation is safer than a false local call edge.
