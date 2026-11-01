@@ -371,12 +371,19 @@ def test_language_order_does_not_change_the_result(fixtures_dir: Path):
     assert graph_to_dict(a) == graph_to_dict(b)
 
 
-def test_single_language_parse_carries_no_metadata(fixtures_dir: Path):
-    """Single-language output must stay byte-identical: no metadata key."""
+def test_single_language_parse_preserves_python_call_coverage(fixtures_dir: Path):
+    """Single-language parse must retain real parser capabilities, not merge extras."""
+    from arcade_agent.parsers.python import PythonParser
+
     root = fixtures_dir / "python_java_mixed"
     graph = parse(str(root), language="python", use_cache=False)
-    assert graph.metadata == {}
-    assert "metadata" not in graph_to_dict(graph)
+    direct = PythonParser().parse(sorted(root.rglob("*.py")), root)
+    assert graph_to_dict(graph) == graph_to_dict(direct)
+    assert graph.relation_coverage()["python"] == {
+        "collected_relations": ["extends", "import"],
+        "call_coverage": "not_collected",
+    }
+    assert set(graph.metadata) == {"relation_coverage"}
 
 
 def test_single_language_parse_matches_direct_parser_output(fixtures_dir: Path):
