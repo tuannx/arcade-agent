@@ -28,8 +28,7 @@ def test_match_bare_capture_shadows_module_call(tmp_path):
         "        case _:\n"
         "            return helper()\n"
     ))
-    assert ("app.captured", "app.helper") not in edges
-    assert ("app.unaffected", "app.helper") in edges
+    assert edges == {("app.unaffected", "app.helper")}
 
 
 def test_match_list_and_mapping_destructuring_shadow(tmp_path):
@@ -54,9 +53,7 @@ def test_match_list_and_mapping_destructuring_shadow(tmp_path):
         "        case _:\n"
         "            return 0\n"
     ))
-    assert ("app.list_capture", "app.helper") not in edges
-    assert ("app.mapping_capture", "app.helper") not in edges
-    assert ("app.unaffected", "app.helper") in edges
+    assert edges == {("app.unaffected", "app.helper")}
 
 
 def test_match_class_keyword_and_as_capture_shadow(tmp_path):
@@ -75,8 +72,7 @@ def test_match_class_keyword_and_as_capture_shadow(tmp_path):
         "        case _:\n"
         "            return 0\n"
     ))
-    assert ("app.class_capture", "app.helper") not in edges
-    assert ("app.alias_capture", "app.helper") not in edges
+    assert edges == set()
 
 
 def test_match_dotted_value_pattern_does_not_shadow(tmp_path):
@@ -89,4 +85,4 @@ def test_match_dotted_value_pattern_does_not_shadow(tmp_path):
         "        case _:\n"
         "            return helper()\n"
     ))
-    assert ("app.actual_call", "app.helper") in edges
+    assert edges == {("app.actual_call", "app.helper")}
