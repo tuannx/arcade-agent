@@ -372,7 +372,25 @@ def _extract_unqualified_calls(node) -> set[str]:
     while stack:
         current, scoped = stack.pop()
         if current.type in _COMPREHENSION_TYPES:
-            scoped = scoped | _comprehension_targets(current)
+            local_scope = scoped | _comprehension_targets(current)
+            # Python evaluates only the FIRST comprehension iterable in the
+            # enclosing scope. The result, guards and later iterables use the
+            # comprehension-local loop targets. Do not suppress a true call
+            # such as [helper for helper in helper()].
+            first_clause = next(
+                (child for child in current.named_children if child.type == "for_in_clause"),
+                None,
+            )
+            for child in current.children:
+                if child is first_clause:
+                    for index, part in enumerate(child.children):
+                        part_scope = (
+                            scoped if child.field_name_for_child(index) == "right" else local_scope
+                        )
+                        stack.append((part, part_scope))
+                else:
+                    stack.append((child, local_scope))
+            continue
         if current.type in ("function_definition", "class_definition", "lambda"):
             name = current.child_by_field_name("name")
             if name is not None:
