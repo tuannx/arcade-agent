@@ -360,15 +360,18 @@ def _parameter_binding_names(params) -> set[str]:
         if current.type == "identifier":
             names.add(_get_text(current))
             continue
-        annotations = {
-            current.child_by_field_name(field)
-            for field in _ANNOTATION_FIELDS.get(current.type, ())
-        }
-        default_value = current.child_by_field_name("value")
-        stack.extend(
-            child for child in current.children
-            if child not in annotations and child is not default_value
-        )
+        if current.type in (
+            "default_parameter", "typed_default_parameter", "typed_parameter"
+        ):
+            # Tree-sitter parameter forms have exactly one binding candidate;
+            # do not walk the sibling type annotation or default expression.
+            name = current.child_by_field_name("name")
+            if name is None and current.named_children:
+                name = current.named_children[0]
+            if name is not None:
+                stack.append(name)
+            continue
+        stack.extend(current.children)
     return names
 
 
