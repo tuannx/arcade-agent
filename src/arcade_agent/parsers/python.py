@@ -347,6 +347,34 @@ def _comprehension_targets(node) -> frozenset[str]:
     return frozenset(names)
 
 
+def _parameter_binding_names(params) -> set[str]:
+    """Find formal parameter names, never annotation or default-value references.
+
+    Those expressions can mention a same-module function without binding it
+    in the body, e.g. `def caller(value: helper=helper): return helper()`.
+    """
+    names: set[str] = set()
+    stack = [params]
+    while stack:
+        current = stack.pop()
+        if current.type == "identifier":
+            names.add(_get_text(current))
+            continue
+        if current.type in (
+            "default_parameter", "typed_default_parameter", "typed_parameter"
+        ):
+            # Tree-sitter parameter forms have exactly one binding candidate;
+            # do not walk the sibling type annotation or default expression.
+            name = current.child_by_field_name("name")
+            if name is None and current.named_children:
+                name = current.named_children[0]
+            if name is not None:
+                stack.append(name)
+            continue
+        stack.extend(current.children)
+    return names
+
+
 def _extract_unqualified_calls(node) -> set[str]:
     """Find only bare calls in a top-level function body, not nested scopes.
 
@@ -364,7 +392,7 @@ def _extract_unqualified_calls(node) -> set[str]:
     shadowed: set[str] = set()
     params = actual.child_by_field_name("parameters")
     if params is not None:
-        shadowed.update(_get_text(n) for n in _collect_nodes(params, "identifier"))
+        shadowed.update(_parameter_binding_names(params))
     calls: set[str] = set()
     # Carry comprehension-local names on the traversal stack. Do not add them
     # to the enclosing function's shadowed set: those targets do not leak.
@@ -418,7 +446,7 @@ def _extract_unqualified_calls(node) -> set[str]:
             for pattern in current.named_children:
                 shadowed.update(_match_capture_names(pattern))
         if current.type in ("import_statement", "import_from_statement",
-                            "global_statement", "nonlocal_statement"):
+                            "nonlocal_statement"):
             # Over-approximation is safer than a false local call edge.
             shadowed.update(_get_text(n) for n in _collect_nodes(current, "identifier"))
         stack.extend((child, scoped) for child in current.children)
