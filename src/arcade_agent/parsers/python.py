@@ -696,8 +696,25 @@ def _resolve_superclass(
                     return target
                 dotted = f"{target}.{rest}"
                 return dotted if dotted in entities else None
-        if not imp["names"] and imp["module"].split(".")[-1] == head and rest:
-            dotted = f"{imp['module']}.{rest}"
+        if not imp["names"] and rest:
+            imported = imp["module"]
+            alias = imp.get("aliases", {}).get(imported)
+            if alias is not None:
+                # `import pkg.base as wire` binds wire, not base or pkg.
+                if head != alias:
+                    continue
+                suffix = rest
+            else:
+                # `import pkg.base` binds pkg; the full qualifier must
+                # include the imported tail before the base class.
+                parts = imported.split(".")
+                if head != parts[0]:
+                    continue
+                tail = ".".join(parts[1:])
+                if tail and not rest.startswith(tail + "."):
+                    continue
+                suffix = rest[len(tail) + 1:] if tail else rest
+            dotted = f"{imported}.{suffix}"
             if dotted in entities:
                 return dotted
     return None
