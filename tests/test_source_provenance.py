@@ -89,3 +89,75 @@ def test_unpinned_dirty_source_is_not_rejected(
     source, sha = committed_source
     (source / "core.py").write_text("answer = 2\n")
     assert resolve_source_commit(source) == sha
+
+
+def _run_report(source: Path, output_dir: Path, monkeypatch: pytest.MonkeyPatch) -> dict:
+    """Exercise the actual analyzer JSON report boundary on a tiny Git repo."""
+    import json
+    import sys
+
+    from arcade_agent.ci.run_self_analysis import main
+
+    output_json = output_dir / "source-provenance.json"
+    monkeypatch.setattr(
+        sys, "argv",
+        [
+            "arcade-self-analysis",
+            "--source", str(source),
+            "--language", "python",
+            "--output-json", str(output_json),
+            "--output-html", str(output_dir / "source-provenance.html"),
+        ],
+    )
+    main()
+    return json.loads(output_json.read_text())
+
+
+def _committed_analysis_source(
+    committed_source: tuple[Path, str],
+) -> tuple[Path, str]:
+    source, _ = committed_source
+    (source / "core.py").write_text("class Widget:\\n    def run(self):\\n        return 1\\n".replace("\\n", "\n"))
+    _git(source, "add", "core.py")
+    _git(
+        source, "-c", "user.name=Test", "-c", "user.email=test@example.com",
+        "commit", "-m", "add analyzable class", "-q",
+    )
+    return source, _git(source, "rev-parse", "HEAD")
+
+
+def test_unpinned_dirty_tracked_report_is_not_commit_exact(
+    committed_source: tuple[Path, str],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source, sha = _committed_analysis_source(committed_source)
+    (source / "core.py").write_text("class Widget:\\n    def run(self):\\n        return 2\\n".replace("\\n", "\n"))
+    result = _run_report(source, tmp_path, monkeypatch)
+    assert result["commit_sha"] == sha  # HEAD metadata remains available.
+    assert result["source_ref"] == f"worktree:{sha}"
+    assert result["source_worktree_state"] == "dirty"
+
+
+def test_unpinned_dirty_untracked_report_is_not_commit_exact(
+    committed_source: tuple[Path, str],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source, sha = _committed_analysis_source(committed_source)
+    (source / "extra.py").write_text("class Untracked:\\n    pass\\n".replace("\\n", "\n"))
+    result = _run_report(source, tmp_path, monkeypatch)
+    assert result["commit_sha"] == sha
+    assert result["source_ref"] == f"worktree:{sha}"
+    assert result["source_worktree_state"] == "dirty"
+
+
+def test_clean_unpinned_report_retains_commit_reference(
+    committed_source: tuple[Path, str],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source, sha = _committed_analysis_source(committed_source)
+    result = _run_report(source, tmp_path, monkeypatch)
+    assert result["commit_sha"] == sha
+    assert result["source_ref"] == f"commit:{sha}"
