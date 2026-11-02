@@ -424,6 +424,43 @@ def _local_import_binding_names(node) -> set[str]:
     return names
 
 
+def _module_class_shadowed_names(root_node) -> dict[int, list[str]]:
+    """Snapshot names last *assigned* before each top-level class statement.
+
+    A module import or class declaration can later be rebound or deleted. Linking a base
+    through a stale earlier import/definition would claim an incorrect extends
+    edge. This scanner handles direct top-level assignments only; dynamic
+    control-flow bindings remain unsupported, not verified inheritance.
+    """
+    last_binding: dict[str, str] = {}
+    snapshots: dict[int, list[str]] = {}
+    for statement in root_node.children:
+        definition = _unwrap_decorated(statement)
+        if definition.type == "class_definition":
+            snapshots[statement.start_byte] = sorted(
+                name for name, kind in last_binding.items() if kind == "assignment"
+            )
+        if statement.type in ("import_statement", "import_from_statement"):
+            for name in _local_import_binding_names(statement):
+                last_binding[name] = "import"
+        elif statement.type == "delete_statement":
+            # A deleted module-level name is no longer bound to its old
+            # import or class. Do not claim inheritance from that stale
+            # definition; a subsequent import can establish it again.
+            for name in _deletion_binding_names(statement):
+                last_binding[name] = "assignment"
+        elif statement.type == "expression_statement":
+            for expression in statement.named_children:
+                if expression.type in ("assignment", "augmented_assignment"):
+                    for name in _binding_names(expression.child_by_field_name("left")):
+                        last_binding[name] = "assignment"
+        elif definition.type in ("class_definition", "function_definition"):
+            name_node = definition.child_by_field_name("name")
+            if name_node is not None:
+                last_binding[_get_text(name_node)] = "definition"
+    return snapshots
+
+
 def _extract_unqualified_calls(node) -> set[str]:
     """Find only bare calls in a top-level function body, not nested scopes.
 
@@ -577,6 +614,8 @@ class FileFacts:
     refs: dict[str, set[str]] = field(default_factory=dict)     # fqn -> referenced names
     module_vars: list[str] = field(default_factory=list)        # top-level assignment names
     calls: dict[str, set[str]] = field(default_factory=dict)     # local bare call candidates
+    # Names reassigned before each class definition (no inferred inheritance edge).
+    superclass_shadows: dict[str, list[str]] = field(default_factory=dict)
 
 
 _PARSER: Parser | None = None
@@ -614,6 +653,7 @@ def extract_file(py_file: Path, root: Path) -> FileFacts | None:
     functions = _extract_functions(root_node)
     methods = _extract_methods(classes, module_name)
     all_decls = classes + methods + functions
+    module_class_shadows = _module_class_shadowed_names(root_node)
 
     if _should_skip_module_entity(py_file, all_decls):
         return None
@@ -621,6 +661,7 @@ def extract_file(py_file: Path, root: Path) -> FileFacts | None:
     entities: dict[str, Entity] = {}
     refs_map: dict[str, set[str]] = {}
     calls_map: dict[str, set[str]] = {}
+    superclass_shadows: dict[str, list[str]] = {}
 
     if not all_decls:
         fqn = module_name
@@ -646,12 +687,17 @@ def extract_file(py_file: Path, root: Path) -> FileFacts | None:
                 properties={"owner": owner_fqn} if owner_fqn else {},
             )
             refs_map[fqn] = refs
+            if decl["kind"] == "class":
+                superclass_shadows[fqn] = module_class_shadows.get(
+                    decl["node"].start_byte, []
+                )
             if decl["kind"] == "function":
                 calls_map[fqn] = _extract_unqualified_calls(decl["node"])
 
     return FileFacts(rel_path=rel_path, package=package, entities=entities,
                      file_imports=file_imports, refs=refs_map,
-                     module_vars=_extract_module_variables(root_node), calls=calls_map)
+                     module_vars=_extract_module_variables(root_node), calls=calls_map,
+                     superclass_shadows=superclass_shadows)
 
 
 def _module_of(rel_path: str) -> str:
@@ -696,8 +742,25 @@ def _resolve_superclass(
                     return target
                 dotted = f"{target}.{rest}"
                 return dotted if dotted in entities else None
-        if not imp["names"] and imp["module"].split(".")[-1] == head and rest:
-            dotted = f"{imp['module']}.{rest}"
+        if not imp["names"] and rest:
+            imported = imp["module"]
+            alias = imp.get("aliases", {}).get(imported)
+            if alias is not None:
+                # `import pkg.base as wire` binds wire, not base or pkg.
+                if head != alias:
+                    continue
+                suffix = rest
+            else:
+                # `import pkg.base` binds pkg; the full qualifier must
+                # include the imported tail before the base class.
+                parts = imported.split(".")
+                if head != parts[0]:
+                    continue
+                tail = ".".join(parts[1:])
+                if tail and not rest.startswith(tail + "."):
+                    continue
+                suffix = rest[len(tail) + 1:] if tail else rest
+            dotted = f"{imported}.{suffix}"
             if dotted in entities:
                 return dotted
     return None
@@ -714,8 +777,10 @@ def link(facts: list[FileFacts]) -> DependencyGraph:
     packages: dict[str, list[str]] = {}
     module_imports: dict[str, list[dict]] = {}
     entity_refs: dict[str, set[str]] = {}
+    superclass_shadows: dict[str, list[str]] = {}
 
     for ff in facts:
+        superclass_shadows.update(ff.superclass_shadows)
         for fqn, ent in ff.entities.items():
             entities[fqn] = ent
             packages.setdefault(ff.package, []).append(fqn)
@@ -808,9 +873,13 @@ def link(facts: list[FileFacts]) -> DependencyGraph:
                 if module in entities:
                     edges.append(Edge(source=fqn, target=module, relation="import"))
         if entity.superclass:
-            target = _resolve_superclass(entity, imports, entities, resolve)
-            if target is not None:
-                edges.append(Edge(source=fqn, target=target, relation="extends"))
+            # Never turn a class's pre-definition module assignment into an
+            # asserted edge to a stale import or local class declaration.
+            head = entity.superclass.partition(".")[0]
+            if head not in superclass_shadows.get(fqn, []):
+                target = _resolve_superclass(entity, imports, entities, resolve)
+                if target is not None:
+                    edges.append(Edge(source=fqn, target=target, relation="extends"))
 
 
     # Bind only direct calls to an unshadowed function *defined in the same
