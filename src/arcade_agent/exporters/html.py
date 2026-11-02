@@ -44,7 +44,7 @@ REPORT_TEMPLATE = Template("""\
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>arcade-agent: {{ repo_name }} ({{ version }})</title>
+    <title>arcade-agent: {{ repo_name | e }} ({{ (source_commit_sha[:12] if source_commit_sha and source_commit_sha != "local" else version) | e }})</title>
     <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -72,7 +72,9 @@ REPORT_TEMPLATE = Template("""\
         h1 { font-size: 1.8rem; margin-bottom: 0.25rem; }
         h2 { font-size: 1.3rem; margin: 2rem 0 1rem; border-bottom: 2px solid #e0e0e0; padding-bottom: 0.5rem; scroll-margin-top: 3.5rem; }
         h3 { font-size: 1.1rem; margin: 1rem 0 0.5rem; }
-        .subtitle { color: #666; margin-bottom: 2rem; }
+        .subtitle { color: #666; margin-bottom: 1rem; }
+        .provenance { display: flex; gap: 0.5rem 1.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; color: #475569; font-size: 0.8rem; }
+        .provenance code { overflow-wrap: anywhere; }
         .stats {
             display: flex; gap: 1.5rem; margin-bottom: 2rem; flex-wrap: wrap;
         }
@@ -137,7 +139,20 @@ REPORT_TEMPLATE = Template("""\
     </nav>
 
     <h1 id="overview">Architecture Report</h1>
-    <p class="subtitle">{{ repo_name }} &mdash; version {{ version }} &mdash; recovered with {{ algorithm }}</p>
+    <p class="subtitle">{{ repo_name | e }} &mdash;
+        {% if source_commit_sha and source_commit_sha != "local" %}
+        source revision {{ source_commit_sha[:12] | e }}
+        {% else %}
+        version {{ version | e }}
+        {% endif %}
+        &mdash; recovered with {{ algorithm | e }}
+    </p>
+    {% if source_commit_sha is not none or analyzer_commit_sha is not none %}
+    <div class="provenance" aria-label="Analysis provenance">
+        <span>Source commit <code>{{ (source_commit_sha or "unavailable") | e }}</code></span>
+        <span>Analyzer commit <code>{{ (analyzer_commit_sha or "unavailable") | e }}</code></span>
+    </div>
+    {% endif %}
 
     <div class="stats">
         <div class="stat-card">
@@ -266,6 +281,8 @@ def export_html(
     metrics: list[MetricResult],
     output_path: Path,
     concerns: dict[str, list[str]] | None = None,
+    source_commit_sha: str | None = None,
+    analyzer_commit_sha: str | None = None,
 ) -> Path:
     """Generate an HTML architecture report.
 
@@ -278,6 +295,8 @@ def export_html(
         metrics: Computed quality metrics.
         output_path: Where to write the HTML file.
         concerns: Optional dict mapping component name to concern labels.
+        source_commit_sha: Exact analyzed source commit, if known.
+        analyzer_commit_sha: Exact analyzer source commit, if known.
 
     Returns:
         Path to the generated HTML file.
@@ -297,6 +316,8 @@ def export_html(
     html = REPORT_TEMPLATE.render(
         repo_name=repo_name,
         version=version,
+        source_commit_sha=source_commit_sha,
+        analyzer_commit_sha=analyzer_commit_sha,
         algorithm=architecture.algorithm or "unknown",
         num_entities=dep_graph.num_entities,
         num_edges=dep_graph.num_edges,
