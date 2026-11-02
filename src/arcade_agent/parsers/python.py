@@ -608,7 +608,8 @@ class FileFacts:
     refs: dict[str, set[str]] = field(default_factory=dict)     # fqn -> referenced names
     module_vars: list[str] = field(default_factory=list)        # top-level assignment names
     calls: dict[str, set[str]] = field(default_factory=dict)     # local bare call candidates
-    superclass_shadows: dict[str, list[str]] = field(default_factory=dict)  # per-class early rebinding
+    # Names reassigned before each class definition (no inferred inheritance edge).
+    superclass_shadows: dict[str, list[str]] = field(default_factory=dict)
 
 
 _PARSER: Parser | None = None
