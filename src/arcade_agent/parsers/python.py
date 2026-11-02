@@ -327,6 +327,28 @@ def _match_capture_names(node) -> set[str]:
 
 
 
+def _deletion_binding_names(node) -> set[str]:
+    """Find names bound by `del` in the current function.
+
+    A bare `del helper` declares `helper` local for the entire function
+    (CPython emits DELETE_FAST), so a later `helper()` must not be linked to
+    a same-module helper. Deleting `obj.helper` or `obj[index]` does NOT
+    bind `obj`: never collect identifiers inside attribute/subscript nodes.
+    """
+    if node.type == "identifier":
+        return {_get_text(node)}
+    if node.type not in (
+        "delete_statement", "expression_list", "tuple", "list",
+        "tuple_pattern", "list_pattern", "pattern_list",
+        "parenthesized_expression",
+    ):
+        return set()
+    names: set[str] = set()
+    for child in node.named_children:
+        names.update(_deletion_binding_names(child))
+    return names
+
+
 _COMPREHENSION_TYPES = {
     "list_comprehension", "set_comprehension",
     "dictionary_comprehension", "generator_expression",
@@ -459,6 +481,8 @@ def _extract_unqualified_calls(node) -> set[str]:
                     calls.add(name)
         if current.type in ("assignment", "augmented_assignment", "for_statement"):
             shadowed.update(_binding_names(current.child_by_field_name("left")))
+        elif current.type == "delete_statement":
+            shadowed.update(_deletion_binding_names(current))
         elif current.type == "named_expression":
             # `name := value` uses the `name` field, not `left`.
             shadowed.update(_binding_names(current.child_by_field_name("name")))
