@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from arcade_agent.ci.provenance import resolve_analyzer_commit
+from arcade_agent.ci.provenance import resolve_analyzer_commit, source_provenance_fields
 
 
 def git(root: Path, *args: str) -> str:
@@ -84,3 +84,15 @@ def test_rejects_arbitrary_git_checkout(analyzer_checkout):
     (root / "pyproject.toml").unlink()
     with pytest.raises(ValueError, match="not an arcade-agent source"):
         resolve_analyzer_commit(root, sha, installed_package=installed)
+
+
+def test_dirty_unpinned_source_is_not_mislabeled_as_commit(analyzer_checkout):
+    root, installed, sha = analyzer_checkout
+    (root / "pyproject.toml").write_text('[project]\nname = "modified"\n')
+    provenance = source_provenance_fields(root)
+    assert provenance["commit_sha"] == sha
+    assert provenance["source_ref"] == f"worktree:{sha}"
+    assert provenance["source_worktree_state"] == "dirty"
+    with pytest.raises(ValueError, match="dirty"):
+        resolve_analyzer_commit(root, sha, installed_package=installed)
+

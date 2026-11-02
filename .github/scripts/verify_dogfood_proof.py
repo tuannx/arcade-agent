@@ -129,6 +129,8 @@ def verify_bundle(
         _require_equal(data.get("commit_sha"), expected_source_sha, f"{label}.commit_sha")
         _require_equal(data.get("source_ref"), f"commit:{expected_source_sha}",
                        f"{label}.source_ref")
+        _require_equal(data.get("source_worktree_state"), "clean",
+                       f"{label}.source_worktree_state")
         _require_equal(data.get("analyzer_commit_sha"), expected_analyzer_sha,
                        f"{label}.analyzer_commit_sha")
 
