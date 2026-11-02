@@ -397,6 +397,30 @@ def _parameter_binding_names(params) -> set[str]:
     return names
 
 
+def _local_import_binding_names(node) -> set[str]:
+    """Only names actually bound by a function-local import statement.
+
+    Imported module paths are references; the alias after 'as' is the
+    binding. For 'import pkg.sub', Python binds 'pkg'; for
+    'import pkg.sub as alias', it binds only 'alias'.
+    """
+    names: set[str] = set()
+    if node.type == "import_statement":
+        for child in node.named_children:
+            if child.type not in ("dotted_name", "aliased_import"):
+                continue
+            original, local = _imported_name(child)
+            bound = local if child.type == "aliased_import" else original.split(".", 1)[0]
+            if bound.isidentifier():
+                names.add(bound)
+    elif node.type == "import_from_statement":
+        for child in node.children_by_field_name("name"):
+            _, local = _imported_name(child)
+            if local.isidentifier():
+                names.add(local)
+    return names
+
+
 def _extract_unqualified_calls(node) -> set[str]:
     """Find only bare calls in a top-level function body, not nested scopes.
 
@@ -495,9 +519,12 @@ def _extract_unqualified_calls(node) -> set[str]:
             # are local to the whole function, not calls to module functions.
             for pattern in current.named_children:
                 shadowed.update(_match_capture_names(pattern))
-        if current.type in ("import_statement", "import_from_statement",
-                            "nonlocal_statement"):
-            # Over-approximation is safer than a false local call edge.
+        if current.type in ("import_statement", "import_from_statement"):
+            # Only the actual bound alias/name shadows same-module functions.
+            # The imported module path never becomes a local variable by itself.
+            shadowed.update(_local_import_binding_names(current))
+        elif current.type == "nonlocal_statement":
+            # Nonlocal names resolve outside this function; do not guess calls.
             shadowed.update(_get_text(n) for n in _collect_nodes(current, "identifier"))
         stack.extend((child, scoped) for child in current.children)
     return calls - shadowed
