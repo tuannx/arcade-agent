@@ -17,7 +17,7 @@ from typing import Any
 from arcade_agent.algorithms.coupling import compute_balanced_scores, graph_quality_context
 from arcade_agent.algorithms.smells import SmellInstance
 from arcade_agent.ci.graph_filter import _filter_non_architectural_entities
-from arcade_agent.ci.provenance import source_provenance_fields
+from arcade_agent.ci.provenance import resolve_analyzer_commit, source_provenance_fields
 from arcade_agent.exporters.json import build_component_summary, build_graph_summary
 from arcade_agent.tools.compute_metrics import compute_metrics
 from arcade_agent.tools.detect_smells import detect_smells
@@ -111,11 +111,24 @@ def main() -> None:
         default=None,
         help="Require the analyzed source tree to be checked out at this full Git commit SHA",
     )
+    parser.add_argument(
+        "--analyzer-source",
+        default=None,
+        help="Path to analyzer checkout actually used to build the installed package",
+    )
+    parser.add_argument(
+        "--expected-analyzer-sha",
+        default=None,
+        help="Required full analyzer Git commit when --analyzer-source is supplied",
+    )
     args = parser.parse_args()
 
     source = str(Path(args.source).resolve())
     try:
         source_provenance = source_provenance_fields(source, args.expected_source_sha)
+        analyzer_commit = resolve_analyzer_commit(
+            args.analyzer_source, args.expected_analyzer_sha,
+        )
     except ValueError as exc:
         parser.error(str(exc))
     language = args.language or None
@@ -187,7 +200,7 @@ def main() -> None:
         "languages": repo.languages,
         **source_provenance,
         "ref": os.environ.get("GITHUB_REF", "local"),
-        "analyzer_commit_sha": os.environ.get("GITHUB_SHA", "local"),
+        "analyzer_commit_sha": analyzer_commit,
         "algorithm": args.algorithm,
         "num_components": len(arch.components),
         "num_entities": graph.num_entities,
