@@ -37,22 +37,55 @@ def resolve_source_commit(source: str | Path, expected_sha: str | None = None) -
     if expected_sha is not None and actual != expected_sha:
         raise ValueError(f"source commit mismatch: expected {expected_sha}, got {actual}")
     if expected_sha is not None:
-        # HEAD alone is insufficient: tracked edits and untracked source files
-        # may change the bytes analyzed without changing the commit identity.
-        try:
-            status = subprocess.run(
-                [
-                    "git", "-C", str(source), "status", "--porcelain=v1",
-                    "--untracked-files=all", "--ignore-submodules=none",
-                ],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-        except OSError as exc:
-            raise ValueError("could not verify pinned source worktree cleanliness") from exc
-        if status.returncode != 0:
+        # A commit pin is only defensible when tracked/untracked status can be checked.
+        state = source_worktree_state(source)
+        if state == "unknown":
             raise ValueError("could not verify pinned source worktree cleanliness")
-        if status.stdout.strip():
+        if state == "dirty":
             raise ValueError("pinned source worktree is dirty (tracked or untracked changes)")
     return actual
+
+
+def source_worktree_state(source: str | Path) -> str:
+    """Classify Git status as clean, dirty, or unknown (cannot verify).
+
+    This is not a byte-level attestation: ignored/generated files, submodules,
+    and concurrent source changes can still make a SHA-labelled report incomplete.
+    """
+    try:
+        status = subprocess.run(
+            [
+                "git", "-C", str(source), "status", "--porcelain=v1",
+                "--untracked-files=all", "--ignore-submodules=none",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return "unknown"
+    if status.returncode != 0:
+        return "unknown"
+    return "dirty" if status.stdout.strip() else "clean"
+
+
+def source_provenance_fields(
+    source: str | Path, expected_sha: str | None = None,
+) -> dict[str, str]:
+    """Produce report fields without calling a dirty checkout commit-exact."""
+    source_sha = resolve_source_commit(source, expected_sha)
+    if source_sha == "local":
+        return {
+            "commit_sha": "local",
+            "source_ref": "local",
+            "source_worktree_state": "not-git",
+        }
+
+    # resolve_source_commit already rejected dirty/unknown pinned worktrees.
+    state = "clean" if expected_sha is not None else source_worktree_state(source)
+    label = {"clean": "commit", "dirty": "worktree", "unknown": "unverified"}[state]
+    return {
+        "commit_sha": source_sha,
+        "source_ref": f"{label}:{source_sha}",
+        "source_worktree_state": state,
+    }
