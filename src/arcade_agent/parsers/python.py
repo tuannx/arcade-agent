@@ -423,7 +423,23 @@ def _extract_unqualified_calls(node) -> set[str]:
             name = current.child_by_field_name("name")
             if name is not None:
                 shadowed.add(_get_text(name))
-            # Never attribute a nested function or closure body to this caller.
+            if current.type == "function_definition":
+                # A nested def evaluates its parameter defaults *now*, inside
+                # this enclosing caller. Its body is deferred, and must not
+                # create call edges for the enclosing function.
+                nested_params = current.child_by_field_name("parameters")
+                if nested_params is not None:
+                    for param in nested_params.named_children:
+                        if param.type not in ("default_parameter", "typed_default_parameter"):
+                            continue
+                        value = param.child_by_field_name("value")
+                        if value is None and param.named_children:
+                            value = param.named_children[-1]
+                        if value is not None:
+                            stack.append((value, scoped))
+            # Never attribute a nested function, class or lambda body to
+            # this caller. Class bases and annotation evaluation remain
+            # uncollected in partial call coverage.
             continue
         if current.type == "call":
             callee = current.child_by_field_name("function")
