@@ -84,12 +84,12 @@ def test_swapped_aliases_never_link_to_similarly_named_module(tmp_path: Path) ->
     # Both imports are valid. The local name 'base' denotes pkg.other,
     # even though the *other* imported module ends in the token 'base'.
     edges = _extends(tmp_path, {
-        "pkg/base.py": "class Base:\\n    pass\\n",
-        "pkg/other.py": "class Base:\\n    pass\\n",
+        "pkg/base.py": "class Base:\n    pass\n",
+        "pkg/other.py": "class Base:\n    pass\n",
         "consumer.py": (
-            "import pkg.base as other\\n"
-            "import pkg.other as base\\n\\n"
-            "class Child(base.Base):\\n    pass\\n"
+            "import pkg.base as other\n"
+            "import pkg.other as base\n\n"
+            "class Child(base.Base):\n    pass\n"
         ),
     })
     assert edges == {("consumer.Child", "pkg.other.Base")}
