@@ -59,7 +59,7 @@ def test_self_analysis_html_and_json_share_exact_provenance(tmp_path, monkeypatc
     assert payload["commit_sha"] == SOURCE_SHA
     assert payload["analyzer_commit_sha"] == ANALYZER_SHA
     html = html_path.read_text()
-    assert f"Source commit" in html
+    assert "Source commit" in html
     assert SOURCE_SHA in html
     assert "Analyzer commit" in html
     assert ANALYZER_SHA in html
