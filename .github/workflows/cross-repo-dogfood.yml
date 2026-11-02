@@ -4,6 +4,12 @@ on:
   pull_request:
     paths:
       - 'src/arcade_agent/ci/**'
+      - 'src/arcade_agent/algorithms/concern.py'
+      - 'src/arcade_agent/algorithms/coupling.py'
+      - 'src/arcade_agent/algorithms/smells.py'
+      - 'tests/test_algorithms/test_non_scoring_candidates.py'
+      - 'src/arcade_agent/tools/detect_smells.py'
+      - 'tests/test_algorithms/test_concern_scatter_evidence.py'
       - 'tests/test_source_provenance.py'
       - '.github/workflows/cross-repo-dogfood.yml'
   workflow_dispatch:
@@ -144,5 +150,134 @@ jobs:
             java-ha-analysis.json
             java-ha-report.html
             java-ha-actual-screenshot.png
+          retention-days: 30
+          if-no-files-found: warn
+
+  python-examples:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TARGET_REPOSITORY: tuannx/arcade-agent-examples
+      TARGET_SHA: 067be3a83a5e58d4d4a8a72ef578e7f7fa588209
+      TARGET_PATH: target-examples/scenarios/synthetic-smells/synthetic/after
+    steps:
+      - name: Checkout analyzer under review
+        uses: actions/checkout@v4
+        with:
+          path: analyzer
+          persist-credentials: false
+
+      - name: Checkout pinned Python corpus
+        uses: actions/checkout@v4
+        with:
+          repository: tuannx/arcade-agent-examples
+          ref: 067be3a83a5e58d4d4a8a72ef578e7f7fa588209
+          path: target-examples
+          persist-credentials: false
+
+      - name: Verify target HEAD
+        run: test "$(git -C target-examples rev-parse HEAD)" = "$TARGET_SHA"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install analyzer from PR source
+        run: python -m pip install "./analyzer[languages]"
+
+      - name: Run pinned Python architecture analysis
+        id: analysis
+        run: |
+          arcade-self-analysis \
+            --source "$TARGET_PATH" \
+            --language python \
+            --repo-name "$TARGET_REPOSITORY" \
+            --expected-source-sha "$TARGET_SHA" \
+            --output-json python-examples-analysis.json \
+            --output-html python-examples-report.html
+
+      - name: Verify report provenance and non-empty analysis
+        if: steps.analysis.outcome == 'success'
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          data = json.loads(Path("python-examples-analysis.json").read_text())
+          assert data["repo_name"] == os.environ["TARGET_REPOSITORY"]
+          assert data["commit_sha"] == os.environ["TARGET_SHA"]
+          assert data["source_ref"] == "commit:" + os.environ["TARGET_SHA"]
+          assert data["analyzer_commit_sha"] == os.environ["GITHUB_SHA"]
+          assert data["num_entities"] > 0
+          assert data["num_components"] > 0
+          print({key: data[key] for key in ("num_entities", "num_edges", "num_components")})
+          PY
+
+      - name: Screenshot actual HTML report
+        id: screenshot
+        if: steps.analysis.outcome == 'success'
+        continue-on-error: true
+        run: |
+          python -m pip install playwright==1.56.0
+          python -m playwright install chromium
+          python - <<'PY'
+          from pathlib import Path
+          from playwright.sync_api import sync_playwright
+          with sync_playwright() as p:
+              browser = p.chromium.launch()
+              page = browser.new_page(viewport={"width": 1440, "height": 900})
+              page.goto(Path("python-examples-report.html").resolve().as_uri())
+              page.screenshot(path="python-examples-actual-screenshot.png")
+              browser.close()
+          image = Path("python-examples-actual-screenshot.png").read_bytes()
+          assert image.startswith(bytes.fromhex("89504e470d0a1a0a")) and len(image) > 2048
+          PY
+
+      - name: Record proof and explicit gaps
+        if: always()
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          report = Path("python-examples-analysis.json")
+          screenshot = Path("python-examples-actual-screenshot.png")
+          data = json.loads(report.read_text()) if report.is_file() else {}
+          proof = {
+              "target_repository": os.environ["TARGET_REPOSITORY"],
+              "target_commit_sha_expected": os.environ["TARGET_SHA"],
+              "target_commit_sha_reported": data.get("commit_sha"),
+              "analyzer_commit_sha": data.get("analyzer_commit_sha", os.environ.get("GITHUB_SHA")),
+              "analysis_outcome": "success" if data else "failed-or-not-run",
+              "screenshot_outcome": "success" if screenshot.is_file() else "failed-or-not-run",
+              "analysis_json_sha256": hashlib.sha256(report.read_bytes()).hexdigest() if report.is_file() else None,
+              "screenshot_sha256": hashlib.sha256(screenshot.read_bytes()).hexdigest() if screenshot.is_file() else None,
+              "num_entities": data.get("num_entities"),
+              "num_edges": data.get("num_edges"),
+              "num_components": data.get("num_components"),
+              "smells_count_heuristic": len(data.get("smells", [])) if data else None,
+              "false_positive_review": "not-evaluated",
+              "unsupported_construct_review": "not-evaluated",
+              "ci_url": "/".join([
+                  os.environ.get("GITHUB_SERVER_URL", "https://github.com"),
+                  os.environ["GITHUB_REPOSITORY"],
+                  "actions/runs", os.environ["GITHUB_RUN_ID"],
+              ]),
+          }
+          Path("python-examples-proof.json").write_text(json.dumps(proof, indent=2) + "\n")
+          print(json.dumps(proof, indent=2))
+          PY
+
+      - name: Upload Python proof even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-examples-dogfood-proof
+          path: |
+            python-examples-proof.json
+            python-examples-analysis.json
+            python-examples-report.html
+            python-examples-actual-screenshot.png
           retention-days: 30
           if-no-files-found: warn
