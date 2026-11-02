@@ -400,8 +400,8 @@ def _parameter_binding_names(params) -> set[str]:
 def _local_import_binding_names(node) -> set[str]:
     """Only names actually bound by a function-local import statement.
 
-    Import paths and names on the right of 'as' are references, not all
-    bindings. For 'import pkg.sub', Python binds 'pkg'; for
+    Imported module paths are references; the alias after 'as' is the
+    binding. For 'import pkg.sub', Python binds 'pkg'; for
     'import pkg.sub as alias', it binds only 'alias'.
     """
     names: set[str] = set()
