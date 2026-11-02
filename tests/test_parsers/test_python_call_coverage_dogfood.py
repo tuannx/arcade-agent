@@ -11,8 +11,8 @@ from arcade_agent.algorithms.coupling import compute_balanced_scores
 from arcade_agent.algorithms.smells import SmellType
 from arcade_agent.parsers.python import PythonParser
 from arcade_agent.serialization import graph_to_dict
-from arcade_agent.tools.parse import parse
 from arcade_agent.tools.detect_smells import detect_smells
+from arcade_agent.tools.parse import parse
 
 
 def _real_python_graph(tmp_path):
