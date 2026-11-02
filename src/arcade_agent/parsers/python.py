@@ -427,7 +427,7 @@ def _local_import_binding_names(node) -> set[str]:
 def _module_class_shadowed_names(root_node) -> dict[int, list[str]]:
     """Snapshot names last *assigned* before each top-level class statement.
 
-    A module import or class declaration can later be rebound. Linking a base
+    A module import or class declaration can later be rebound or deleted. Linking a base
     through a stale earlier import/definition would claim an incorrect extends
     edge. This scanner handles direct top-level assignments only; dynamic
     control-flow bindings remain unsupported, not verified inheritance.
@@ -443,6 +443,12 @@ def _module_class_shadowed_names(root_node) -> dict[int, list[str]]:
         if statement.type in ("import_statement", "import_from_statement"):
             for name in _local_import_binding_names(statement):
                 last_binding[name] = "import"
+        elif statement.type == "delete_statement":
+            # A deleted module-level name is no longer bound to its old
+            # import or class. Do not claim inheritance from that stale
+            # definition; a subsequent import can establish it again.
+            for name in _deletion_binding_names(statement):
+                last_binding[name] = "assignment"
         elif statement.type == "expression_statement":
             for expression in statement.named_children:
                 if expression.type in ("assignment", "augmented_assignment"):
