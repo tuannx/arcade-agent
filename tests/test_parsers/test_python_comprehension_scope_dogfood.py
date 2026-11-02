@@ -1,0 +1,98 @@
+"""Golden fixtures for Python 3 comprehension-local call bindings.
+
+A comprehension loop target is local to its implicit scope.
+It must not invent a same-module call edge or suppress a real outer call.
+These are graph facts, not architecture verdicts or production FP rates.
+"""
+
+from arcade_agent.parsers.python import PythonParser
+from arcade_agent.tools.parse import parse
+
+
+def _call_edges(tmp_path, source: str) -> set[tuple[str, str]]:
+    path = tmp_path / "app.py"
+    path.write_text(source, encoding="utf-8")
+    graph = PythonParser().parse([path], tmp_path)
+    return {
+        (src, dst)
+        for src, dst, relation in graph.to_edge_tuples()
+        if relation == "calls"
+    }
+
+
+def test_comprehension_target_does_not_link_to_module_function(tmp_path):
+    edges = _call_edges(tmp_path, (
+        "def helper():\n    return 1\n\n"
+        "def shadowed(values):\n"
+        "    return [helper() for helper in values]\n\n"
+        "def unshadowed(values):\n"
+        "    return [helper() for value in values]\n"
+    ))
+    assert edges == {("app.unshadowed", "app.helper")}
+
+
+def test_comprehension_binding_does_not_leak_into_outer_scope(tmp_path):
+    edges = _call_edges(tmp_path, (
+        "def helper():\n    return 1\n\n"
+        "def outer(values):\n"
+        "    values = [value for helper in values]\n"
+        "    return helper()\n"
+    ))
+    assert edges == {("app.outer", "app.helper")}
+
+
+def test_nested_generator_and_destructured_targets_are_scoped(tmp_path):
+    edges = _call_edges(tmp_path, (
+        "def helper():\n    return 1\n\n"
+        "def nested(groups):\n"
+        "    return [[helper() for helper in group] for group in groups]\n\n"
+        "def generator(values):\n"
+        "    return (helper() for helper in values)\n\n"
+        "def destructured(pairs):\n"
+        "    return [helper() for helper, item in pairs]\n\n"
+        "def unrelated(groups):\n"
+        "    return [[helper() for value in group] for group in groups]\n"
+    ))
+    assert edges == {("app.unrelated", "app.helper")}
+
+
+def test_set_dict_and_multiple_clause_targets_are_scoped(tmp_path):
+    edges = _call_edges(tmp_path, (
+        "def helper():\n    return 1\n\n"
+        "def set_shadow(values):\n"
+        "    return {helper() for helper in values}\n\n"
+        "def dict_shadow(pairs):\n"
+        "    return {helper(): value for helper, value in pairs}\n\n"
+        "def second_clause(groups):\n"
+        "    return [helper() for group in groups for helper in group]\n\n"
+        "def set_real_call(values):\n"
+        "    return {helper() for value in values}\n"
+    ))
+    assert edges == {("app.set_real_call", "app.helper")}
+
+
+def test_comprehension_scope_survives_cold_and_warm_cache(tmp_path):
+    """Scoped call resolution must not drift between parse and cache replay."""
+    path = tmp_path / "app.py"
+    path.write_text(
+        "def helper():\n    return 1\n\n"
+        "def shadowed(values):\n"
+        "    return [helper() for helper in values]\n\n"
+        "def unaffected(values):\n"
+        "    result = [helper() for item in values]\n"
+        "    return helper(), result\n",
+        encoding="utf-8",
+    )
+    graphs = [
+        PythonParser().parse([path], tmp_path),
+        parse(str(tmp_path), language="python", use_cache=True),
+        parse(str(tmp_path), language="python", use_cache=True),
+    ]
+    expected = {("app.unaffected", "app.helper")}
+    for graph in graphs:
+        edges = {
+            (source, target)
+            for source, target, relation in graph.to_edge_tuples()
+            if relation == "calls"
+        }
+        assert edges == expected
