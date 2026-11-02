@@ -10,6 +10,8 @@ from arcade_agent.algorithms.concern import detect_concern_overload
 from arcade_agent.algorithms.coupling import compute_balanced_scores
 from arcade_agent.algorithms.smells import SmellType
 from arcade_agent.parsers.python import PythonParser
+from arcade_agent.serialization import graph_to_dict
+from arcade_agent.tools.parse import parse
 from arcade_agent.tools.detect_smells import detect_smells
 
 
@@ -67,3 +69,23 @@ def test_unverified_coverage_warning_does_not_change_quality_score(tmp_path):
     assert _derived_scores(architecture, graph, warnings) == _derived_scores(
         architecture, graph, [],
     )
+
+
+def test_cached_python_graph_preserves_non_scoring_coverage_guard(tmp_path):
+    """Cold and warm cache must not erase the partial-parser warning."""
+    architecture, direct = _real_python_graph(tmp_path)
+    cold = parse(str(tmp_path), language="python", use_cache=True)
+    warm = parse(str(tmp_path), language="python", use_cache=True)
+
+    assert graph_to_dict(cold) == graph_to_dict(warm) == graph_to_dict(direct)
+    for graph in (cold, warm):
+        assert graph.relation_coverage()["python"]["call_coverage"] == "not_collected"
+        warnings = [
+            item for item in detect_smells(architecture, graph)
+            if item.smell_type == SmellType.CONCERN_OVERLOAD
+        ]
+        assert len(warnings) == 1
+        assert warnings[0].scoring_eligible is False
+        assert _derived_scores(architecture, graph, warnings) == _derived_scores(
+            architecture, graph, [],
+        )
