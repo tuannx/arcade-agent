@@ -135,7 +135,7 @@ smell burden, or another architectural pressure.
 ## Supported Languages
 
 - Java (full support)
-- Python (full support)
+- Python (imports and inheritance; conservative **partial** same-module bare-call extraction, not dynamic dispatch)
 - C/C++ (full support)
 - TypeScript/JavaScript (full support)
 - Go (full support)
