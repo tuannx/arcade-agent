@@ -79,8 +79,11 @@ def _extract_imports(root_node) -> list[dict]:
             # import foo, import foo.bar, import foo as f
             for sub in child.children:
                 if sub.type in ("dotted_name", "aliased_import"):
-                    module, _alias = _imported_name(sub)
-                    imports.append({"module": module, "level": 0, "names": [], "aliases": {}})
+                    module, alias = _imported_name(sub)
+                    # A plain import binds its first module segment; an 'as'
+                    # import binds only the alias, never the source module name.
+                    aliases = {module: alias} if sub.type == "aliased_import" else {}
+                    imports.append({"module": module, "level": 0, "names": [], "aliases": aliases})
 
         elif child.type == "import_from_statement":
             # from foo import bar, baz as qux; from ..foo import bar; from . import bar
@@ -797,7 +800,10 @@ def link(facts: list[FileFacts]) -> DependencyGraph:
                     if target is not None:
                         edges.append(Edge(source=fqn, target=target, relation="import"))
             else:
-                if refs and module.split(".")[-1] not in refs:
+                # For 'import pkg.sub', Python binds 'pkg'; for
+                # 'import pkg.sub as gateway', Python binds 'gateway'.
+                bound = aliases.get(module, module.split(".", 1)[0])
+                if refs and bound not in refs:
                     continue
                 if module in entities:
                     edges.append(Edge(source=fqn, target=module, relation="import"))
@@ -816,7 +822,8 @@ def link(facts: list[FileFacts]) -> DependencyGraph:
             if imp["names"]:
                 shadowed.update(imp.get("aliases", {}).get(name, name) for name in imp["names"])
             else:
-                shadowed.add(imp["module"].split(".", 1)[0])
+                module = imp["module"]
+                shadowed.add(imp.get("aliases", {}).get(module, module.split(".", 1)[0]))
         for caller, names in ff.calls.items():
             for name in sorted(names):
                 if name in shadowed:
