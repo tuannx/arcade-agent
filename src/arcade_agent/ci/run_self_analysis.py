@@ -239,6 +239,8 @@ def main() -> None:
         smells,
         metrics + derived_metrics,
         output=args.output_html,
+        source_commit_sha=source_commit,
+        analyzer_commit_sha=analyzer_commit,
     )
     print(f"  HTML report  → {html_out}")
     print("Done.")

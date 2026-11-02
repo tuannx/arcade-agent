@@ -31,6 +31,8 @@ def visualize(
     output: str = "report.html",
     format: str | None = None,
     concerns: dict[str, list[str]] | None = None,
+    source_commit_sha: str | None = None,
+    analyzer_commit_sha: str | None = None,
 ) -> str:
     """Generate a visualization of the architecture analysis.
 
@@ -44,6 +46,8 @@ def visualize(
         output: Output file path.
         format: Output format (html, dot, json, rsf, mermaid). Auto-detected from extension.
         concerns: Optional dict mapping component name to concern labels (LLM-extracted).
+        source_commit_sha: Exact analyzed-source commit for HTML provenance, if known.
+        analyzer_commit_sha: Exact analyzer commit for HTML provenance, if known.
 
     Returns:
         Path to the generated output file (or content string for mermaid).
@@ -64,6 +68,8 @@ def visualize(
         export_html(
             repo_name, version, dep_graph, architecture,
             smells, metrics, output_path, concerns=concerns,
+            source_commit_sha=source_commit_sha,
+            analyzer_commit_sha=analyzer_commit_sha,
         )
     elif format == "dot":
         content = export_dot(architecture, dep_graph)
