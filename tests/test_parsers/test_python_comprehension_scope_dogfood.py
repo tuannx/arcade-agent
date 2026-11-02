@@ -6,6 +6,7 @@ These are graph facts, not architecture verdicts or production FP rates.
 """
 
 from arcade_agent.parsers.python import PythonParser
+from arcade_agent.tools.parse import parse
 
 
 def _call_edges(tmp_path, source: str) -> set[tuple[str, str]]:
@@ -68,3 +69,30 @@ def test_set_dict_and_multiple_clause_targets_are_scoped(tmp_path):
         "    return {helper() for value in values}\n"
     ))
     assert edges == {("app.set_real_call", "app.helper")}
+
+
+def test_comprehension_scope_survives_cold_and_warm_cache(tmp_path):
+    """Scoped call resolution must not drift between parse and cache replay."""
+    path = tmp_path / "app.py"
+    path.write_text(
+        "def helper():\n    return 1\n\n"
+        "def shadowed(values):\n"
+        "    return [helper() for helper in values]\n\n"
+        "def unaffected(values):\n"
+        "    result = [helper() for item in values]\n"
+        "    return helper(), result\n",
+        encoding="utf-8",
+    )
+    graphs = [
+        PythonParser().parse([path], tmp_path),
+        parse(str(tmp_path), language="python", use_cache=True),
+        parse(str(tmp_path), language="python", use_cache=True),
+    ]
+    expected = {("app.unaffected", "app.helper")}
+    for graph in graphs:
+        edges = {
+            (source, target)
+            for source, target, relation in graph.to_edge_tuples()
+            if relation == "calls"
+        }
+        assert edges == expected

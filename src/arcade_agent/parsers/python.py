@@ -348,11 +348,7 @@ def _comprehension_targets(node) -> frozenset[str]:
 
 
 def _parameter_binding_names(params) -> set[str]:
-    """Find formal parameter names, never annotation or default-value references.
-
-    Those expressions can mention a same-module function without binding it
-    in the body, e.g. `def caller(value: helper=helper): return helper()`.
-    """
+    """Find formal names without treating annotations/defaults as local bindings."""
     names: set[str] = set()
     stack = [params]
     while stack:
@@ -363,8 +359,6 @@ def _parameter_binding_names(params) -> set[str]:
         if current.type in (
             "default_parameter", "typed_default_parameter", "typed_parameter"
         ):
-            # Tree-sitter parameter forms have exactly one binding candidate;
-            # do not walk the sibling type annotation or default expression.
             name = current.child_by_field_name("name")
             if name is None and current.named_children:
                 name = current.named_children[0]

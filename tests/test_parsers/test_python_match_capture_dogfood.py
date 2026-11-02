@@ -6,6 +6,7 @@ These assertions test graph facts, not architecture quality verdicts.
 """
 
 from arcade_agent.parsers.python import PythonParser
+from arcade_agent.tools.parse import parse
 
 
 def _edges(tmp_path, source: str) -> set[tuple[str, str]]:
@@ -86,3 +87,37 @@ def test_match_dotted_value_pattern_does_not_shadow(tmp_path):
         "            return helper()\n"
     ))
     assert edges == {("app.actual_call", "app.helper")}
+
+
+
+def test_match_capture_shadows_prior_call_and_cache_stays_stable(tmp_path):
+    """A capture binds the whole function, even before the match statement."""
+    path = tmp_path / "app.py"
+    path.write_text(
+        "def helper():\n    return 1\n\n"
+        "def before_match(value):\n"
+        "    result = helper()\n"
+        "    match value:\n"
+        "        case helper:\n"
+        "            return result\n\n"
+        "def unaffected(value):\n"
+        "    match value:\n"
+        "        case Constants.helper:\n"
+        "            return helper()\n"
+        "        case _:\n"
+        "            return 0\n",
+        encoding="utf-8",
+    )
+    graphs = [
+        PythonParser().parse([path], tmp_path),
+        parse(str(tmp_path), language="python", use_cache=True),
+        parse(str(tmp_path), language="python", use_cache=True),
+    ]
+    expected = {("app.unaffected", "app.helper")}
+    for graph in graphs:
+        edges = {
+            (source, target)
+            for source, target, relation in graph.to_edge_tuples()
+            if relation == "calls"
+        }
+        assert edges == expected

@@ -231,9 +231,6 @@ jobs:
             --algorithm acdc \
             --output-json arcade_analysis_acdc.json \
             --output-html arcade_analysis_acdc.html
-          if [ "${ARCADE_AGENT_VERSION}" = "source" ]; then
-            ARGS+=(--analyzer-source target-repo --expected-analyzer-sha "$(git -C target-repo rev-parse HEAD)")
-          fi
           arcade-self-analysis \
             "${ARGS[@]}" \
             --algorithm wca \

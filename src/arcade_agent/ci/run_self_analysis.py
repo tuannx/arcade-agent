@@ -17,7 +17,7 @@ from typing import Any
 from arcade_agent.algorithms.coupling import compute_balanced_scores, graph_quality_context
 from arcade_agent.algorithms.smells import SmellInstance
 from arcade_agent.ci.graph_filter import _filter_non_architectural_entities
-from arcade_agent.ci.provenance import resolve_analyzer_commit, resolve_source_commit
+from arcade_agent.ci.provenance import resolve_analyzer_commit, source_provenance_fields
 from arcade_agent.exporters.json import build_component_summary, build_graph_summary
 from arcade_agent.tools.compute_metrics import compute_metrics
 from arcade_agent.tools.detect_smells import detect_smells
@@ -125,7 +125,7 @@ def main() -> None:
 
     source = str(Path(args.source).resolve())
     try:
-        source_commit = resolve_source_commit(source, args.expected_source_sha)
+        source_provenance = source_provenance_fields(source, args.expected_source_sha)
         analyzer_commit = resolve_analyzer_commit(
             args.analyzer_source, args.expected_analyzer_sha,
         )
@@ -198,9 +198,8 @@ def main() -> None:
         "repo_name": args.repo_name or repo.name,
         "language": repo.language or language,
         "languages": repo.languages,
-        "commit_sha": source_commit,
+        **source_provenance,
         "ref": os.environ.get("GITHUB_REF", "local"),
-        "source_ref": f"commit:{source_commit}" if source_commit != "local" else "local",
         "analyzer_commit_sha": analyzer_commit,
         "algorithm": args.algorithm,
         "num_components": len(arch.components),

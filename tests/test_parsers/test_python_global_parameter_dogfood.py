@@ -53,3 +53,40 @@ def test_parameter_default_is_not_binding_but_real_parameters_are(tmp_path):
         "    return helper()\n"
     ))
     assert edges == {("app.defaulted", "app.helper")}
+
+
+def test_global_and_parameter_bindings_survive_direct_cold_warm_cache(tmp_path):
+    """Four true calls and four shadowed controls on identical source bytes."""
+    from arcade_agent.tools.parse import parse
+
+    path = tmp_path / "app.py"
+    path.write_text(
+        "def helper():\n    return 1\n\n"
+        "def read_global():\n    global helper\n    return helper()\n\n"
+        "def typed_default(value: helper = helper):\n    return helper()\n\n"
+        "def positional_default(value=helper, /):\n    return helper()\n\n"
+        "def keyword_default(*, value: helper = helper):\n    return helper()\n\n"
+        "def bound_positional(helper, /):\n    return helper()\n\n"
+        "def bound_keyword(*, helper: int):\n    return helper()\n\n"
+        "def bound_varargs(*helper):\n    return helper()\n\n"
+        "def bound_kwargs(**helper):\n    return helper()\n",
+        encoding="utf-8",
+    )
+    expected = {
+        ("app.read_global", "app.helper"),
+        ("app.typed_default", "app.helper"),
+        ("app.positional_default", "app.helper"),
+        ("app.keyword_default", "app.helper"),
+    }
+    graphs = [
+        PythonParser().parse([path], tmp_path),
+        parse(str(tmp_path), language="python", use_cache=True),
+        parse(str(tmp_path), language="python", use_cache=True),
+    ]
+    for graph in graphs:
+        actual = {
+            (source, target)
+            for source, target, relation in graph.to_edge_tuples()
+            if relation == "calls"
+        }
+        assert actual == expected
