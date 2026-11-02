@@ -38,6 +38,7 @@ def bundle(tmp_path):
     payload = {
         "repo_name": REPO, "commit_sha": SOURCE_SHA,
         "analyzer_commit_sha": ANALYZER_SHA, "source_ref": f"commit:{SOURCE_SHA}",
+        "source_worktree_state": "clean",
         "num_entities": 8, "num_edges": 9, "num_components": 3,
         "component_dependencies": [{"source": "A", "target": "B"}],
         "metrics": {"RCI": 0.5}, "derived_metrics": {"BalancedArchitectureScore": 0.6},
@@ -159,4 +160,37 @@ def test_score_drivers_tampering_with_updated_hash_rejected(bundle):
 def test_missing_component_field_with_updated_hash_rejected(bundle):
     _rewrite_analysis_and_manifest(bundle, lambda payload: payload.pop("components"))
     with pytest.raises(verifier.VerificationError, match="replay.components"):
+        run(bundle)
+
+
+
+def _rewrite_both_provenance_states(bundle, state):
+    """Adversarial producer and fresh replay agreeing on a non-commit source."""
+    for name in ("analysis.json", "replay.json"):
+        report = json.loads(bundle[name].read_text())
+        if state is None:
+            report.pop("source_worktree_state", None)
+        else:
+            report["source_worktree_state"] = state
+        bundle[name].write_text(json.dumps(report))
+    proof = json.loads(bundle["proof.json"].read_text())
+    proof["analysis_json_sha256"] = hashlib.sha256(
+        bundle["analysis.json"].read_bytes()
+    ).hexdigest()
+    bundle["proof.json"].write_text(json.dumps(proof))
+
+
+def test_dirty_source_worktree_state_with_rehashed_manifest_rejected(bundle):
+    _rewrite_both_provenance_states(bundle, "dirty")
+    with pytest.raises(
+        verifier.VerificationError, match="producer.source_worktree_state"
+    ):
+        run(bundle)
+
+
+def test_missing_source_worktree_state_with_rehashed_manifest_rejected(bundle):
+    _rewrite_both_provenance_states(bundle, None)
+    with pytest.raises(
+        verifier.VerificationError, match="producer.source_worktree_state"
+    ):
         run(bundle)

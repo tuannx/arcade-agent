@@ -1,8 +1,8 @@
-"""Dogfood regression: Python import-only graphs must not assert cohesive evidence.
+"""Dogfood regression: partial Python calls cannot verify component cohesion.
 
 A SHA-pinned arcade-agent self-run reported a medium Concern Overload for
-Tools (26 entities, two internal imports). Python's linker only emits imports
-and inheritance, not internal calls; the missing calls can explain sparsity.
+Tools (26 entities, two internal imports). Python's partial static calls
+cannot establish full cohesion; missing dynamic calls may explain sparsity.
 """
 
 from arcade_agent.algorithms.architecture import Architecture, Component
@@ -10,7 +10,9 @@ from arcade_agent.algorithms.concern import detect_concern_overload
 from arcade_agent.algorithms.coupling import compute_balanced_scores
 from arcade_agent.algorithms.smells import SmellType
 from arcade_agent.parsers.python import PythonParser
+from arcade_agent.serialization import graph_to_dict
 from arcade_agent.tools.detect_smells import detect_smells
+from arcade_agent.tools.parse import parse
 
 
 def _real_python_graph(tmp_path):
@@ -38,7 +40,6 @@ def test_python_parser_declares_partial_call_coverage(tmp_path):
         "collected_relations": ["calls", "extends", "import"],
         "call_coverage": "partial",
     }
-    # The 26 fixture functions have no calls; capability is still declared partial.
     assert all(edge.relation in {"import", "extends", "calls"} for edge in graph.edges)
 
 
@@ -68,3 +69,23 @@ def test_unverified_coverage_warning_does_not_change_quality_score(tmp_path):
     assert _derived_scores(architecture, graph, warnings) == _derived_scores(
         architecture, graph, [],
     )
+
+
+def test_cached_python_graph_preserves_non_scoring_coverage_guard(tmp_path):
+    """Cold and warm cache must not erase the partial-parser warning."""
+    architecture, direct = _real_python_graph(tmp_path)
+    cold = parse(str(tmp_path), language="python", use_cache=True)
+    warm = parse(str(tmp_path), language="python", use_cache=True)
+
+    assert graph_to_dict(cold) == graph_to_dict(warm) == graph_to_dict(direct)
+    for graph in (cold, warm):
+        assert graph.relation_coverage()["python"]["call_coverage"] == "partial"
+        warnings = [
+            item for item in detect_smells(architecture, graph)
+            if item.smell_type == SmellType.CONCERN_OVERLOAD
+        ]
+        assert len(warnings) == 1
+        assert warnings[0].scoring_eligible is False
+        assert _derived_scores(architecture, graph, warnings) == _derived_scores(
+            architecture, graph, [],
+        )
