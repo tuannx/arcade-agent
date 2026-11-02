@@ -113,11 +113,15 @@ def _run_report(source: Path, output_dir: Path, monkeypatch: pytest.MonkeyPatch)
     return json.loads(output_json.read_text())
 
 
+def _widget_source(value: int) -> str:
+    return f"class Widget:\\n    def run(self):\\n        return {value}\\n".replace("\\n", "\n")
+
+
 def _committed_analysis_source(
     committed_source: tuple[Path, str],
 ) -> tuple[Path, str]:
     source, _ = committed_source
-    (source / "core.py").write_text("class Widget:\\n    def run(self):\\n        return 1\\n".replace("\\n", "\n"))
+    (source / "core.py").write_text(_widget_source(1))
     _git(source, "add", "core.py")
     _git(
         source, "-c", "user.name=Test", "-c", "user.email=test@example.com",
@@ -132,7 +136,7 @@ def test_unpinned_dirty_tracked_report_is_not_commit_exact(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     source, sha = _committed_analysis_source(committed_source)
-    (source / "core.py").write_text("class Widget:\\n    def run(self):\\n        return 2\\n".replace("\\n", "\n"))
+    (source / "core.py").write_text(_widget_source(2))
     result = _run_report(source, tmp_path, monkeypatch)
     assert result["commit_sha"] == sha  # HEAD metadata remains available.
     assert result["source_ref"] == f"worktree:{sha}"
