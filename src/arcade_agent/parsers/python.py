@@ -289,6 +289,43 @@ def _binding_names(node) -> set[str]:
     return set()
 
 
+
+def _match_capture_names(node) -> set[str]:
+    """Collect only *bindings* in a tree-sitter Python match/case pattern.
+
+    A bare pattern identifier is a capture, while a dotted value reference,
+    a class name, a mapping key, and a class keyword name are *not* captures.
+    Pattern bindings apply to the entire enclosing Python function scope.
+    """
+    if node.type in ("identifier", "dotted_name"):
+        name = _get_text(node)
+        return {name} if name.isidentifier() and name != "_" else set()
+
+    if node.type == "class_pattern":
+        # The first named child is the class expression, not a binding.
+        children = node.named_children[1:]
+    elif node.type == "keyword_pattern":
+        # The first identifier names an attribute, not a bound variable.
+        children = node.named_children[1:]
+    elif node.type == "dict_pattern":
+        # Mapping keys are value patterns. Only values and **rest bind names.
+        children = [
+            child for idx, child in enumerate(node.children)
+            if node.field_name_for_child(idx) == "value"
+            or child.type == "splat_pattern"
+        ]
+    elif node.type in ("case_pattern", "as_pattern", "union_pattern",
+                       "list_pattern", "tuple_pattern", "splat_pattern"):
+        children = node.named_children
+    else:
+        return set()
+
+    captured: set[str] = set()
+    for child in children:
+        captured.update(_match_capture_names(child))
+    return captured
+
+
 def _extract_unqualified_calls(node) -> set[str]:
     """Find only bare calls in a top-level function body, not nested scopes.
 
@@ -330,6 +367,11 @@ def _extract_unqualified_calls(node) -> set[str]:
             # `with ... as name` and `except Error as name` bind locally.
             # Do not link their calls to a same-named module function.
             shadowed.update(_binding_names(current.child_by_field_name("alias")))
+        elif current.type == "case_clause":
+            # Match captures (including nested destructuring and `as` aliases)
+            # are local to the whole function, not calls to module functions.
+            for pattern in current.named_children:
+                shadowed.update(_match_capture_names(pattern))
         if current.type in ("import_statement", "import_from_statement",
                             "global_statement", "nonlocal_statement"):
             # Over-approximation is safer than a false local call edge.
