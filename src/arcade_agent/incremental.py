@@ -31,7 +31,7 @@ _SKIP = {"__skip__": True}  # marker: this file contributes no entity
 
 # Bump when per-file extraction changes, so cached facts from an older
 # extractor are not reused for byte-identical files.
-_EXTRACT_VERSION = "3"
+_EXTRACT_VERSION = "4"
 
 
 def file_key(path: Path) -> str:
@@ -55,6 +55,7 @@ def _facts_to_json(ff) -> dict:
         "file_imports": ff.file_imports,
         "refs": {fqn: sorted(r) for fqn, r in ff.refs.items()},
         "module_vars": ff.module_vars,
+        "calls": {fqn: sorted(names) for fqn, names in ff.calls.items()},
     }
 
 
@@ -67,6 +68,7 @@ def _facts_from_json(d: dict):
         file_imports=d["file_imports"],
         refs={fqn: set(r) for fqn, r in d["refs"].items()},
         module_vars=d.get("module_vars", []),
+        calls={fqn: set(names) for fqn, names in d.get("calls", {}).items()},
     )
 
 

@@ -1,8 +1,8 @@
-"""Dogfood regression: Python import-only graphs must not assert cohesive evidence.
+"""Dogfood regression: partial Python calls cannot verify component cohesion.
 
 A SHA-pinned arcade-agent self-run reported a medium Concern Overload for
-Tools (26 entities, two internal imports). Python's linker only emits imports
-and inheritance, not internal calls; the missing calls can explain sparsity.
+Tools (26 entities, two internal imports). Python's partial static calls
+cannot establish full cohesion; missing dynamic calls may explain sparsity.
 """
 
 from arcade_agent.algorithms.architecture import Architecture, Component
@@ -34,13 +34,13 @@ def _derived_scores(architecture, graph, smells):
     return {metric.name: metric.value for metric in metrics}, signals
 
 
-def test_python_parser_explicitly_declares_uncollected_calls(tmp_path):
+def test_python_parser_declares_partial_call_coverage(tmp_path):
     _, graph = _real_python_graph(tmp_path)
     assert graph.relation_coverage()["python"] == {
-        "collected_relations": ["extends", "import"],
-        "call_coverage": "not_collected",
+        "collected_relations": ["calls", "extends", "import"],
+        "call_coverage": "partial",
     }
-    assert all(edge.relation in {"import", "extends"} for edge in graph.edges)
+    assert all(edge.relation in {"import", "extends", "calls"} for edge in graph.edges)
 
 
 def test_sparse_python_tools_is_a_low_severity_coverage_warning(tmp_path):
@@ -79,7 +79,7 @@ def test_cached_python_graph_preserves_non_scoring_coverage_guard(tmp_path):
 
     assert graph_to_dict(cold) == graph_to_dict(warm) == graph_to_dict(direct)
     for graph in (cold, warm):
-        assert graph.relation_coverage()["python"]["call_coverage"] == "not_collected"
+        assert graph.relation_coverage()["python"]["call_coverage"] == "partial"
         warnings = [
             item for item in detect_smells(architecture, graph)
             if item.smell_type == SmellType.CONCERN_OVERLOAD
