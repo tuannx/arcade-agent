@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - 'src/arcade_agent/ci/**'
+      # Parser changes can alter graph metrics and false-positive rates.
+      - 'src/arcade_agent/parsers/**'
+      - 'tests/test_parsers/**'
       - 'src/arcade_agent/algorithms/concern.py'
       - 'src/arcade_agent/algorithms/coupling.py'
       - 'src/arcade_agent/algorithms/smells.py'
