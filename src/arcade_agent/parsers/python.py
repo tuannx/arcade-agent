@@ -418,6 +418,15 @@ def _extract_unqualified_calls(node) -> set[str]:
             name = current.child_by_field_name("name")
             if name is not None:
                 shadowed.add(_get_text(name))
+            if current.type == "class_definition":
+                # Nested class bases and metaclass keyword expressions run at
+                # class-definition time in the enclosing scope. Attribute
+                # dispatch is still unresolved. Never traverse the class
+                # body here: methods are deferred and class statements have
+                # their own namespace.
+                for child in current.children:
+                    if child.type == "argument_list":
+                        stack.append((child, scoped))
             if current.type in ("function_definition", "lambda"):
                 # Nested function AND lambda parameter defaults are evaluated
                 # when the callable is created, in the enclosing scope. Their
@@ -432,9 +441,9 @@ def _extract_unqualified_calls(node) -> set[str]:
                             value = param.named_children[-1]
                         if value is not None:
                             stack.append((value, scoped))
-            # Never attribute a nested function, class or lambda body to
-            # this caller. Class bases and annotation evaluation remain
-            # uncollected in partial call coverage.
+            # Never attribute nested function, class or lambda bodies to this
+            # caller. Class bodies and annotation evaluation remain outside
+            # our partial call coverage.
             continue
         if current.type == "call":
             callee = current.child_by_field_name("function")
