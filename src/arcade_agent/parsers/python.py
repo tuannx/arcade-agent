@@ -373,8 +373,9 @@ def _extract_unqualified_calls(node) -> set[str]:
     """Find only bare calls in a top-level function body, not nested scopes.
 
     This is a *partial* static signal. Exclude names potentially shadowed by
-    parameters, local bindings, or local imports. Attribute/dynamic calls and
-    decorators are not mapped as call edges; runtime dispatch is unknown.
+    parameters, local bindings, or local imports. Attribute/dynamic calls
+    and implicit decorator application are not mapped as call edges; runtime
+    dispatch is unknown.
     """
     actual = _unwrap_decorated(node)
     if actual.type != "function_definition":
@@ -417,10 +418,10 @@ def _extract_unqualified_calls(node) -> set[str]:
             name = current.child_by_field_name("name")
             if name is not None:
                 shadowed.add(_get_text(name))
-            if current.type == "function_definition":
-                # A nested def evaluates its parameter defaults *now*, inside
-                # this enclosing caller. Its body is deferred, and must not
-                # create call edges for the enclosing function.
+            if current.type in ("function_definition", "lambda"):
+                # Nested function AND lambda parameter defaults are evaluated
+                # when the callable is created, in the enclosing scope. Their
+                # bodies are deferred, so only traverse default values.
                 nested_params = current.child_by_field_name("parameters")
                 if nested_params is not None:
                     for param in nested_params.named_children:
