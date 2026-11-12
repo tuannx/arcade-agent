@@ -49,9 +49,17 @@ inputs:
     required: false
     default: ""
   primary-algorithm:
-    description: Primary architecture recovery algorithm.
+    description: Primary architecture recovery algorithm (pkg, spec, wca, acdc).
     required: false
     default: pkg
+  spec-path:
+    description: Optional architecture.spec.json path (used when primary-algorithm is spec or changed-only filtering maps changed files).
+    required: false
+    default: ""
+  changed-only:
+    description: When true on pull_request events, limit component/smell tables in the comparison report to components touched by the PR.
+    required: false
+    default: "false"
   filter-non-architectural-helpers:
     description: Apply arcade-agent self-dogfooding helper filters. Leave false for generic repositories.
     required: false
@@ -78,6 +86,10 @@ inputs:
     default: "30"
   baseline-branch:
     description: Branch used for baseline artifacts. Defaults to the repository default branch.
+    required: false
+    default: ""
+  baseline-workflow-id:
+    description: Optional workflow filename or ID used to search baseline runs on the baseline branch.
     required: false
     default: ""
   baseline-artifact-name:
@@ -158,6 +170,7 @@ runs:
         EXCLUDE_TESTS: ${{ inputs.exclude-tests }}
         REPO_NAME: ${{ inputs.repo-name }}
         PRIMARY_ALGORITHM: ${{ inputs.primary-algorithm }}
+        SPEC_PATH: ${{ inputs.spec-path }}
         FILTER_NON_ARCHITECTURAL_HELPERS: ${{ inputs.filter-non-architectural-helpers }}
       run: |
         ARGS=(--source "${SOURCE_PATH}")
@@ -174,6 +187,9 @@ runs:
         fi
         if [ -n "${REPO_NAME}" ]; then
           ARGS+=(--repo-name "${REPO_NAME}")
+        fi
+        if [ -n "${SPEC_PATH}" ]; then
+          ARGS+=(--spec "${SPEC_PATH}")
         fi
         if [ "${FILTER_NON_ARCHITECTURAL_HELPERS}" = "true" ]; then
           ARGS+=(--filter-non-architectural-helpers)
@@ -245,17 +261,37 @@ runs:
       uses: actions/github-script@v7
       env:
         BASELINE_ARTIFACT_NAME: ${{ inputs.baseline-artifact-name }}
+        BASELINE_WORKFLOW_ID: ${{ inputs.baseline-workflow-id }}
       with:
         script: |
           const fs = require('fs');
           const baselineArtifactName = process.env.BASELINE_ARTIFACT_NAME;
-          const runs = await github.rest.actions.listWorkflowRunsForRepo({
+          const baselineWorkflowId = process.env.BASELINE_WORKFLOW_ID;
+          const baselineBranch = process.env.ARCADE_BASELINE_BRANCH;
+
+          const downloadById = async (artifactId, label) => {
+            const download = await github.rest.actions.downloadArtifact({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              artifact_id: artifactId,
+              archive_format: 'zip',
+            });
+            fs.writeFileSync('baseline.zip', Buffer.from(download.data));
+            core.setOutput('found', 'true');
+            console.log(`Downloaded baseline (${label})`);
+            return true;
+          };
+
+          const runQuery = {
             owner: context.repo.owner,
             repo: context.repo.repo,
-            branch: process.env.ARCADE_BASELINE_BRANCH,
+            branch: baselineBranch,
             status: 'success',
-            per_page: 20,
-          });
+            per_page: 50,
+          };
+          const runs = baselineWorkflowId
+            ? await github.rest.actions.listWorkflowRuns({ ...runQuery, workflow_id: baselineWorkflowId })
+            : await github.rest.actions.listWorkflowRunsForRepo(runQuery);
 
           for (const run of runs.data.workflow_runs) {
             const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
@@ -263,22 +299,27 @@ runs:
               repo: context.repo.repo,
               run_id: run.id,
             });
-
             const baseline = artifacts.data.artifacts.find(
-              artifact => artifact.name === baselineArtifactName
+              artifact => artifact.name === baselineArtifactName && !artifact.expired
             );
             if (!baseline) continue;
+            await downloadById(baseline.id, `run ${run.id} at ${run.created_at}`);
+            return;
+          }
 
-            const download = await github.rest.actions.downloadArtifact({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              artifact_id: baseline.id,
-              archive_format: 'zip',
-            });
-
-            fs.writeFileSync('baseline.zip', Buffer.from(download.data));
-            core.setOutput('found', 'true');
-            console.log(`Downloaded baseline from run ${run.id} (${run.created_at})`);
+          // Fallback: search artifacts directly by exact name so busy repos with many
+          // other workflows on the baseline branch never evict the architecture baseline.
+          const namedArtifacts = await github.rest.actions.listArtifactsForRepo({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            name: baselineArtifactName,
+            per_page: 50,
+          });
+          const match = namedArtifacts.data.artifacts.find(
+            artifact => !artifact.expired && artifact.workflow_run?.head_branch === baselineBranch
+          );
+          if (match) {
+            await downloadById(match.id, `artifact ${match.id} created ${match.created_at}`);
             return;
           }
 
@@ -297,9 +338,15 @@ runs:
       shell: bash
       env:
         RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        CHANGED_ONLY: ${{ inputs.changed-only }}
+        SOURCE_PATH: ${{ inputs.source-path }}
+        SPEC_PATH: ${{ inputs.spec-path }}
+        EVENT_NAME: ${{ github.event_name }}
+        BASE_REF: ${{ github.base_ref }}
       run: |
         BASELINE_ARG=""
         BASELINE_NOTE=""
+        EXTRA_ARGS=()
         CURRENT_ALGORITHM=$(python -c "import json; from pathlib import Path; print(json.loads(Path('arcade_analysis_results.json').read_text()).get('algorithm', ''))")
         if [ -f baseline_dir/arcade_analysis_baseline.json ]; then
           BASELINE_ALGORITHM=$(python -c "import json; from pathlib import Path; print(json.loads(Path('baseline_dir/arcade_analysis_baseline.json').read_text()).get('algorithm', ''))")
@@ -311,13 +358,28 @@ runs:
         else
           BASELINE_NOTE="Improvement tracking is unavailable because no baseline artifact was found yet. After the next successful push to ${ARCADE_BASELINE_BRANCH}, PR improvement deltas will appear."
         fi
+        if [ "${CHANGED_ONLY}" = "true" ] && [ "${EVENT_NAME}" = "pull_request" ]; then
+          EXTRA_ARGS+=(--changed-only)
+          RESOLVED_SPEC="${SPEC_PATH:-${SOURCE_PATH}/architecture.spec.json}"
+          if [ -f "${RESOLVED_SPEC}" ]; then
+            EXTRA_ARGS+=(--spec "${RESOLVED_SPEC}")
+          fi
+          if [ -n "${BASE_REF}" ]; then
+            git fetch origin "${BASE_REF}" --depth=1 2>/dev/null || true
+            git diff --name-only "origin/${BASE_REF}...HEAD" > changed_files.txt 2>/dev/null || true
+            if [ -s changed_files.txt ]; then
+              EXTRA_ARGS+=(--changed-files-file changed_files.txt)
+            fi
+          fi
+        fi
         arcade-compare-baseline \
           arcade_analysis_results.json \
           $BASELINE_ARG \
           --output pr_comment.md \
           --output-html arcade_analysis_comparison.html \
           --baseline-note "$BASELINE_NOTE" \
-          --run-url "$RUN_URL"
+          --run-url "$RUN_URL" \
+          "${EXTRA_ARGS[@]}"
 
     - name: Upload analysis artifacts
       if: ${{ inputs.upload-artifacts == 'true' }}

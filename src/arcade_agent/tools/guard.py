@@ -215,6 +215,95 @@ def _evaluate(
     return dep_graph, mapping, edges, violations, not_evaluated
 
 
+def _normalize_changed_path(raw: str, source_path: str) -> str:
+    """Normalize a changed path so both repo-root and source-root paths match spec globs."""
+    cleaned = raw.strip().replace("\\", "/")
+    while cleaned.startswith("./"):
+        cleaned = cleaned[2:]
+    src = Path(source_path).resolve()
+    try:
+        candidate = Path(raw.strip())
+        if candidate.is_absolute():
+            return candidate.resolve().relative_to(src).as_posix()
+    except ValueError:
+        pass
+    src_name = src.name
+    if src_name and cleaned.startswith(f"{src_name}/"):
+        return cleaned[len(src_name) + 1 :]
+    return cleaned
+
+
+def match_changed_components(
+    spec: c.ArchitectureSpec,
+    source_path: str,
+    changed_files: list[str],
+) -> list[str]:
+    """Map changed file paths onto spec component names in spec order."""
+    matchers = [(comp.name, c.glob_to_regex(comp.match)) for comp in spec.components if comp.match]
+    matched: set[str] = set()
+    for raw in changed_files:
+        norm = _normalize_changed_path(raw, source_path)
+        for name, rx in matchers:
+            if rx.match(norm):
+                matched.add(name)
+                break
+    return [comp.name for comp in spec.components if comp.name in matched]
+
+
+def _violation_touches(violation: c.Violation, components: set[str]) -> bool:
+    if violation.source in components or violation.target in components:
+        return True
+    if violation.rule == "dependency-cycle":
+        members = {m.strip() for m in violation.message.split(":", 1)[-1].split(",")}
+        return bool(members & components)
+    return any(comp == violation.message.split(" ", 1)[0] for comp in components)
+
+
+def _component_summary_rows(
+    spec: c.ArchitectureSpec,
+    mapping: dict[str, str],
+    edges: dict[tuple[str, str], int],
+    violations: list[c.Violation],
+    only: set[str] | None = None,
+) -> list[dict[str, Any]]:
+    sizes: dict[str, int] = {}
+    for comp in mapping.values():
+        sizes[comp] = sizes.get(comp, 0) + 1
+    out_edges: dict[str, int] = {}
+    in_edges: dict[str, int] = {}
+    for (src, dst), _ in edges.items():
+        out_edges[src] = out_edges.get(src, 0) + 1
+        in_edges[dst] = in_edges.get(dst, 0) + 1
+    cycle_members: set[str] = set()
+    v_from: dict[str, int] = {}
+    v_to: dict[str, int] = {}
+    for v in violations:
+        if v.source:
+            v_from[v.source] = v_from.get(v.source, 0) + 1
+        if v.target:
+            v_to[v.target] = v_to.get(v.target, 0) + 1
+        if v.rule == "dependency-cycle":
+            cycle_members.update(m.strip() for m in v.message.split(":", 1)[-1].split(","))
+
+    rows: list[dict[str, Any]] = []
+    for comp_spec in spec.components:
+        if only is not None and comp_spec.name not in only:
+            continue
+        rows.append(
+            {
+                "component": comp_spec.name,
+                "layer": comp_spec.layer,
+                "entities": sizes.get(comp_spec.name, 0),
+                "out_edges": out_edges.get(comp_spec.name, 0),
+                "in_edges": in_edges.get(comp_spec.name, 0),
+                "violations_from": v_from.get(comp_spec.name, 0),
+                "violations_to": v_to.get(comp_spec.name, 0),
+                "in_cycle": comp_spec.name in cycle_members,
+            }
+        )
+    return rows
+
+
 @tool(
     name="check_architecture",
     description="Check a codebase against its architecture.spec.json. Returns "
@@ -228,6 +317,7 @@ def check_architecture(
     language: str | None = None,
     use_cache: bool = True,
     baseline_num_smells: int | None = None,
+    changed_files: list[str] | None = None,
 ) -> dict[str, Any]:
     """Check an implementation against its intended architecture.
 
@@ -239,6 +329,8 @@ def check_architecture(
         use_cache: Reuse the parse cache when parsing.
         baseline_num_smells: Smell count of the accepted baseline, which enables
             the ``max_new_smells`` budget.
+        changed_files: Optional changed file paths used to compute
+            component-scoped violations and touched component summaries.
 
     Returns:
         Verdict, error/warning counts, violations, component edges, and the
@@ -252,7 +344,7 @@ def check_architecture(
     sizes: dict[str, int] = {}
     for comp in mapping.values():
         sizes[comp] = sizes.get(comp, 0) + 1
-    return {
+    result: dict[str, Any] = {
         "verdict": c.verdict(violations),
         "errors": errors,
         "warnings": len(violations) - errors,
@@ -265,6 +357,20 @@ def check_architecture(
         "unmapped_entities": sizes.get(c.UNMAPPED, 0),
         "budgets_not_evaluated": not_evaluated,
     }
+    if changed_files is not None:
+        touched = match_changed_components(spec, source_path, changed_files)
+        touched_set = set(touched)
+        scoped = [v for v in violations if _violation_touches(v, touched_set)]
+        scoped_errors = sum(1 for v in scoped if v.severity == c.ERROR)
+        result["touched_components"] = touched
+        result["scoped_verdict"] = c.verdict(scoped)
+        result["scoped_errors"] = scoped_errors
+        result["scoped_warnings"] = len(scoped) - scoped_errors
+        result["scoped_violations"] = [v.to_dict() for v in scoped]
+        result["component_summary"] = _component_summary_rows(
+            spec, mapping, edges, violations, only=touched_set
+        )
+    return result
 
 
 @tool(

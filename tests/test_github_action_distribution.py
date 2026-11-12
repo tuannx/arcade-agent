@@ -165,6 +165,9 @@ def test_action_inputs_are_not_embedded_in_github_script_literals():
     assert github_script_blocks
     assert all("${{ inputs." not in block for block in github_script_blocks)
     assert "BASELINE_ARTIFACT_NAME: ${{ inputs.baseline-artifact-name }}" in action
+    assert "BASELINE_WORKFLOW_ID: ${{ inputs.baseline-workflow-id }}" in action
+    assert "changed-only:" in action
+    assert "spec-path:" in action
     assert "BASELINE_WORKFLOW_ID: ${{ inputs.baseline-workflow-id }}" in workflow
 
 

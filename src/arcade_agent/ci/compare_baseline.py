@@ -17,6 +17,7 @@ import os
 import sys
 from pathlib import Path
 
+from arcade_agent.algorithms import conformance as _conformance
 from arcade_agent.algorithms.architecture import Architecture, Component
 from arcade_agent.exporters.html import build_snapshot_mermaid, export_evolution_html
 from arcade_agent.tools.compare import compare
@@ -430,13 +431,15 @@ def _normalize_snapshot(data: dict | None) -> dict | None:
     for component in components:
         total_counts[component["name"]] = total_counts.get(component["name"], 0) + 1
 
+    is_spec = normalized.get("algorithm") == "spec"
     seen_counts: dict[str, int] = {}
     used_names: set[str] = set()
     rename_map: dict[str, list[str]] = {}
     for component in components:
         base_name = component["name"]
         needs_derived_name = (
-            total_counts[base_name] > 1 or _is_generic_component_name(component)
+            total_counts[base_name] > 1
+            or (not is_spec and _is_generic_component_name(component))
         )
         derived_name = (
             _derive_component_name_from_entities(component)
@@ -691,11 +694,77 @@ def _build_dependency_rows(current: dict, baseline: dict | None) -> list[dict]:
     return rows
 
 
+def _changed_component_names(
+    report: dict,
+    *,
+    changed_components: set[str] | None = None,
+    changed_files: list[str] | None = None,
+    spec_path: str | None = None,
+) -> set[str]:
+    """Identify components impacted by the PR (by changed files, spec globs, or baseline delta)."""
+    names: set[str] = set(changed_components or set())
+
+    if changed_files and spec_path:
+        spec_file = Path(spec_path).expanduser()
+        if spec_file.is_file():
+            spec = _conformance.load_spec(spec_file)
+            matchers = [
+                (comp.name, _conformance.glob_to_regex(comp.match))
+                for comp in spec.components
+                if comp.match
+            ]
+            src_prefix = spec_file.parent.name
+            for raw in changed_files:
+                cleaned = raw.strip().replace("\\", "/")
+                while cleaned.startswith("./"):
+                    cleaned = cleaned[2:]
+                if src_prefix and cleaned.startswith(f"{src_prefix}/"):
+                    cleaned = cleaned[len(src_prefix) + 1 :]
+                for comp_name, rx in matchers:
+                    if rx.match(cleaned):
+                        names.add(comp_name)
+                        break
+
+    for row in report.get("component_rows", []):
+        status = row.get("status")
+        if status in {"added", "removed"}:
+            if row.get("current_name", "-") != "-":
+                names.add(row["current_name"])
+            if row.get("baseline_name", "-") != "-":
+                names.add(row["baseline_name"])
+            continue
+        for field in ("entities", "classes", "methods"):
+            val = str(row.get(field, ""))
+            if "(" in val and not val.endswith("(0)") and "n/a" not in val:
+                names.add(row["current_name"])
+                if row.get("baseline_name", "-") != "-":
+                    names.add(row["baseline_name"])
+
+    for row in report.get("dependency_rows", []):
+        if row.get("status") in {"added", "removed"}:
+            names.add(row["source"])
+            names.add(row["target"])
+
+    return names
+
+
+def _component_row_in_scope(row: dict, changed: set[str]) -> bool:
+    return row.get("current_name") in changed or row.get("baseline_name") in changed
+
+
+def _dep_row_in_scope(row: dict, changed: set[str]) -> bool:
+    return row.get("source") in changed or row.get("target") in changed
+
+
 def build_report_payload(
     current: dict,
     baseline: dict | None,
     run_url: str = "",
     baseline_note: str = "",
+    changed_only: bool = False,
+    changed_components: set[str] | None = None,
+    changed_files: list[str] | None = None,
+    spec_path: str | None = None,
 ) -> dict:
     """Build a unified before/after comparison payload."""
     baseline = _normalize_snapshot(baseline)
@@ -713,7 +782,7 @@ def build_report_payload(
             "value": f"{a2a_result['overall_similarity']:.4f}" if a2a_result else "n/a",
         },
     ]
-    return {
+    payload: dict = {
         "repo_name": repo_name,
         "baseline_commit": (baseline or {}).get("commit_sha", "none")[:7] or "none",
         "current_commit": current.get("commit_sha", "local")[:7],
@@ -728,7 +797,20 @@ def build_report_payload(
         "baseline_note": baseline_note,
         "graph_quality": current.get("graph_quality"),
         "baseline_graph_quality": (baseline or {}).get("graph_quality"),
+        "changed_only": changed_only,
     }
+    if changed_only:
+        payload["changed_components"] = sorted(
+            _changed_component_names(
+                payload,
+                changed_components=changed_components,
+                changed_files=changed_files,
+                spec_path=spec_path,
+            )
+        )
+    else:
+        payload["changed_components"] = None
+    return payload
 
 
 def _write_step_summary(path: Path, report: dict) -> None:
@@ -806,34 +888,66 @@ def _write_step_summary(path: Path, report: dict) -> None:
         lines.append("```")
         lines.append("\n</details>")
 
-    lines.append("\n## 🏗️ High-Level Components\n")
-    lines.append("| Component | Entities | Classes | Methods |")
-    lines.append("|-----------|----------|---------|---------|")
-    for component in sorted(
-        current.get("components", []),
-        key=lambda comp: (-_component_size(comp), comp.get("comparison_name", comp["name"])),
-    ):
-        lines.append(
-            f"| {component.get('comparison_name', component['name'])} | "
-            f"{_component_size(component)} | {component.get('class_count', 0)} | "
-            f"{component.get('method_count', 0)} |"
-        )
+    changed_list = report.get("changed_components")
+    changed_set = set(changed_list) if changed_list is not None else None
+
+    components_to_show = [
+        component
+        for component in current.get("components", [])
+        if changed_set is None
+        or component.get("comparison_name", component["name"]) in changed_set
+    ]
+    heading = (
+        "\n## 🏗️ Changed Components\n"
+        if changed_set is not None
+        else "\n## 🏗️ High-Level Components\n"
+    )
+    lines.append(heading)
+    if changed_set is not None and not components_to_show:
+        lines.append("_No component-level changes detected in this diff._")
+    else:
+        if changed_set is not None:
+            lines.append(
+                f"_Showing {len(components_to_show)} changed component(s) of "
+                f"{len(current.get('components', []))} total._\n"
+            )
+        lines.append("| Component | Entities | Classes | Methods |")
+        lines.append("|-----------|----------|---------|---------|")
+        for component in sorted(
+            components_to_show,
+            key=lambda comp: (-_component_size(comp), comp.get("comparison_name", comp["name"])),
+        ):
+            lines.append(
+                f"| {component.get('comparison_name', component['name'])} | "
+                f"{_component_size(component)} | {component.get('class_count', 0)} | "
+                f"{component.get('method_count', 0)} |"
+            )
 
     if baseline:
-        lines.append("\n<details><summary>Component Changes</summary>\n")
-        lines.append(
-            "\n| Status | Baseline | Current | Similarity | Entities | Classes | Methods |"
+        scoped_comp_rows = (
+            [row for row in report["component_rows"] if _component_row_in_scope(row, changed_set)]
+            if changed_set is not None
+            else report["component_rows"]
         )
-        lines.append("|--------|----------|---------|------------|----------|---------|---------|")
-        for row in report["component_rows"]:
+        if scoped_comp_rows:
+            lines.append("\n<details><summary>Component Changes</summary>\n")
             lines.append(
-                f"| {row['status']} | {row['baseline_name']} | {row['current_name']} | "
-                f"{row['similarity']} | {row['entities']} | {row['classes']} | {row['methods']} |"
+                "\n| Status | Baseline | Current | Similarity | Entities | Classes | Methods |"
             )
-        lines.append("\n</details>")
+            lines.append("|--------|----------|---------|------------|----------|---------|---------|")
+            for row in scoped_comp_rows:
+                lines.append(
+                    f"| {row['status']} | {row['baseline_name']} | {row['current_name']} | "
+                    f"{row['similarity']} | {row['entities']} | "
+                    f"{row['classes']} | {row['methods']} |"
+                )
+            lines.append("\n</details>")
 
         dependency_delta = [
-            row for row in report["dependency_rows"] if row["status"] != "matched"
+            row
+            for row in report["dependency_rows"]
+            if row["status"] != "matched"
+            and (changed_set is None or _dep_row_in_scope(row, changed_set))
         ]
         if dependency_delta:
             lines.append("\n<details><summary>Dependency Delta</summary>\n")
@@ -881,6 +995,10 @@ def build_comment(
     baseline: dict | None,
     run_url: str = "",
     baseline_note: str = "",
+    changed_only: bool = False,
+    changed_components: set[str] | None = None,
+    changed_files: list[str] | None = None,
+    spec_path: str | None = None,
 ) -> str:
     """Build a Markdown PR comment body."""
     lines: list[str] = []
@@ -890,7 +1008,13 @@ def build_comment(
         baseline,
         run_url=run_url,
         baseline_note=baseline_note,
+        changed_only=changed_only,
+        changed_components=changed_components,
+        changed_files=changed_files,
+        spec_path=spec_path,
     )
+    changed_list = report.get("changed_components")
+    changed_set = set(changed_list) if changed_list is not None else None
     current = report["current"]
     baseline = report.get("baseline")
     cur_metrics = _all_metric_values(current)
@@ -1085,35 +1209,66 @@ def build_comment(
 
     # -- Components --------------------------------------------------------------
     if cur_components:
-        lines.append("<details><summary>🏗️ Components breakdown</summary>\n")
-        lines.append("| Component | Entities | Classes | Methods |")
-        lines.append("|-----------|----------|---------|---------|")
-        for comp in sorted(
-            cur_components,
-            key=lambda c: (
-                -(c.get("num_entities") or len(c.get("entities", []))),
-                c.get("comparison_name", c["name"]),
-            ),
-        ):
-            count = comp.get("num_entities") or len(comp.get("entities", []))
-            lines.append(
-                f"| {comp.get('comparison_name', comp['name'])} | {count} | "
-                f"{comp.get('class_count', 0)} | {comp.get('method_count', 0)} |"
-            )
+        scoped_components = [
+            comp
+            for comp in cur_components
+            if changed_set is None
+            or comp.get("comparison_name", comp["name"]) in changed_set
+        ]
+        summary_label = (
+            f"🏗️ Changed components breakdown ({len(scoped_components)}/{len(cur_components)})"
+            if changed_set is not None
+            else "🏗️ Components breakdown"
+        )
+        lines.append(f"<details><summary>{summary_label}</summary>\n")
+        if changed_set is not None and not scoped_components:
+            lines.append("_No components changed in this diff._")
+        else:
+            lines.append("| Component | Entities | Classes | Methods |")
+            lines.append("|-----------|----------|---------|---------|")
+            for comp in sorted(
+                scoped_components,
+                key=lambda c: (
+                    -(c.get("num_entities") or len(c.get("entities", []))),
+                    c.get("comparison_name", c["name"]),
+                ),
+            ):
+                count = comp.get("num_entities") or len(comp.get("entities", []))
+                lines.append(
+                    f"| {comp.get('comparison_name', comp['name'])} | {count} | "
+                    f"{comp.get('class_count', 0)} | {comp.get('method_count', 0)} |"
+                )
         lines.append("</details>\n")
 
     # -- Smells ------------------------------------------------------------------
-    lines.append("### 🚨 Architectural Smells\n")
-    if cur_smells:
+    scoped_smells = (
+        [
+            s
+            for s in cur_smells
+            if set(s.get("affected_components", [])) & changed_set
+        ]
+        if changed_set is not None
+        else cur_smells
+    )
+    lines.append(
+        "### 🚨 Architectural Smells (changed modules)\n"
+        if changed_set is not None
+        else "### 🚨 Architectural Smells\n"
+    )
+    if scoped_smells:
         lines.append("| Severity | Type | Affected Components |")
         lines.append("|----------|------|---------------------|")
-        for s in cur_smells:
+        for s in scoped_smells:
             si = _severity_icon(s.get("severity", ""))
             stype = s.get("smell_type", "Unknown")
             comps = ", ".join(s.get("affected_components", []))
             lines.append(f"| {si} {s.get('severity','?')} | {stype} | {comps} |")
     else:
-        lines.append("✅ No architectural smells detected.")
+        lines.append(
+            "✅ No architectural smells detected in changed components."
+            if changed_set is not None
+            else "✅ No architectural smells detected."
+        )
     lines.append("")
 
     # -- Evolution (before/after) ------------------------------------------------
@@ -1160,15 +1315,38 @@ def build_comment(
             # instead a split product or merge target does not appear in
             # either list; it is reported via "Splits"/"Merges" above.
             matches = a2a_result.get("matches", [])
-            matched = [m for m in matches if m.get("source") and m.get("target")]
+            matched = [
+                m
+                for m in matches
+                if m.get("source")
+                and m.get("target")
+                and (
+                    changed_set is None
+                    or m["source"] in changed_set
+                    or m["target"] in changed_set
+                )
+            ]
             structural = a2a_result.get("structural") or {}
-            added_names = sorted(structural.get("added", []))
-            removed_names = sorted(structural.get("removed", []))
+            added_names = sorted(
+                name
+                for name in structural.get("added", [])
+                if changed_set is None or name in changed_set
+            )
+            removed_names = sorted(
+                name
+                for name in structural.get("removed", [])
+                if changed_set is None or name in changed_set
+            )
             # A component that kept its name while its entities churned
             # entirely belongs to neither list: it used to appear in both,
             # contradicting the "matched" row for the very same component.
             rewritten_entries = sorted(
-                structural.get("rewritten", []), key=lambda entry: entry["name"]
+                (
+                    entry
+                    for entry in structural.get("rewritten", [])
+                    if changed_set is None or entry["name"] in changed_set
+                ),
+                key=lambda entry: entry["name"],
             )
 
             if matched or added_names or removed_names or rewritten_entries:
@@ -1203,14 +1381,27 @@ def build_comment(
                     lines.append("")
                 lines.append("</details>\n")
 
+        comp_rows = (
+            [r for r in report["component_rows"] if _component_row_in_scope(r, changed_set)]
+            if changed_set is not None
+            else report["component_rows"]
+        )
         lines.append("<details><summary>High-level component statistics</summary>\n")
-        lines.append("| Status | Baseline | Current | Similarity | Entities | Classes | Methods |")
-        lines.append("|--------|----------|---------|------------|----------|---------|---------|")
-        for row in report["component_rows"]:
+        if changed_set is not None and not comp_rows:
+            lines.append("_No component-level changes in this diff._")
+        else:
             lines.append(
-                f"| {row['status']} | {row['baseline_name']} | {row['current_name']} | "
-                f"{row['similarity']} | {row['entities']} | {row['classes']} | {row['methods']} |"
+                "| Status | Baseline | Current | Similarity | Entities | Classes | Methods |"
             )
+            lines.append(
+                "|--------|----------|---------|------------|----------|---------|---------|"
+            )
+            for row in comp_rows:
+                lines.append(
+                    f"| {row['status']} | {row['baseline_name']} | {row['current_name']} | "
+                    f"{row['similarity']} | {row['entities']} | "
+                    f"{row['classes']} | {row['methods']} |"
+                )
         lines.append("</details>\n")
 
         lines.append("<details><summary>Before/After Mermaid diagrams</summary>\n")
@@ -1224,11 +1415,21 @@ def build_comment(
         lines.append("```")
         lines.append("</details>\n")
 
+        dep_rows = (
+            [r for r in report["dependency_rows"] if _dep_row_in_scope(r, changed_set)]
+            if changed_set is not None
+            else report["dependency_rows"]
+        )
         lines.append("<details><summary>Component dependency delta</summary>\n")
-        lines.append("| Status | Source | Target |")
-        lines.append("|--------|--------|--------|")
-        for row in report["dependency_rows"]:
-            lines.append(f"| {row['status']} | {row['source']} | {row['target']} |")
+        if changed_set is not None and not dep_rows:
+            lines.append("| Status | Source | Target |")
+            lines.append("|--------|--------|--------|")
+            lines.append("| matched | No dependency delta in changed modules | - |")
+        else:
+            lines.append("| Status | Source | Target |")
+            lines.append("|--------|--------|--------|")
+            for row in dep_rows:
+                lines.append(f"| {row['status']} | {row['source']} | {row['target']} |")
         lines.append("</details>\n")
 
         # Smell changes
@@ -1347,6 +1548,33 @@ def main() -> None:
         default="",
         help="Optional note explaining why baseline comparison is unavailable or partial",
     )
+    parser.add_argument(
+        "--changed-only",
+        action="store_true",
+        help="Only show components, dependencies, and smells affected by this change",
+    )
+    parser.add_argument(
+        "--changed-components",
+        nargs="*",
+        default=None,
+        help="Explicit component names touched by this change",
+    )
+    parser.add_argument(
+        "--changed-files",
+        nargs="*",
+        default=None,
+        help="Changed file paths mapped against --spec when filtering to changed components",
+    )
+    parser.add_argument(
+        "--changed-files-file",
+        default="",
+        help="Path to file listing changed file paths (one per line)",
+    )
+    parser.add_argument(
+        "--spec",
+        default="",
+        help="Optional architecture.spec.json path used with --changed-files",
+    )
     args = parser.parse_args()
 
     current_path = Path(args.current)
@@ -1369,17 +1597,36 @@ def main() -> None:
         else:
             print(f"Baseline file not found: {bl_path} — running without baseline")
 
+    changed_files: list[str] = list(args.changed_files or [])
+    if args.changed_files_file:
+        cf_path = Path(args.changed_files_file)
+        if cf_path.is_file():
+            changed_files.extend(
+                line.strip() for line in cf_path.read_text().splitlines() if line.strip()
+            )
+
+    changed_comp_set = set(args.changed_components) if args.changed_components else None
+    spec_arg = args.spec or None
+
     report = build_report_payload(
         current,
         baseline,
         run_url=args.run_url,
         baseline_note=args.baseline_note,
+        changed_only=args.changed_only,
+        changed_components=changed_comp_set,
+        changed_files=changed_files or None,
+        spec_path=spec_arg,
     )
     comment = build_comment(
         current,
         baseline,
         run_url=args.run_url,
         baseline_note=args.baseline_note,
+        changed_only=args.changed_only,
+        changed_components=changed_comp_set,
+        changed_files=changed_files or None,
+        spec_path=spec_arg,
     )
 
     out = Path(args.output)

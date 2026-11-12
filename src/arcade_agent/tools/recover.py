@@ -1,5 +1,8 @@
 """Tool: Recover software architecture from dependency graph."""
 
+from pathlib import Path
+
+from arcade_agent.algorithms import conformance
 from arcade_agent.algorithms.acdc import acdc
 from arcade_agent.algorithms.arc import arc
 from arcade_agent.algorithms.architecture import Architecture, Component
@@ -294,11 +297,67 @@ def _common_prefix_segments(packages: list[str]) -> list[str]:
     return prefix
 
 
+def _spec_based_recovery(
+    dep_graph: DependencyGraph,
+    spec_path: str | Path,
+) -> Architecture:
+    """Group entities strictly according to components declared in an architecture spec."""
+    spec_file = Path(spec_path).expanduser()
+    if not spec_file.is_file():
+        raise FileNotFoundError(f"Architecture spec not found: {spec_file}")
+
+    spec = conformance.load_spec(spec_file)
+    mapping = conformance.map_entities(dep_graph, spec)
+
+    grouped: dict[str, list[str]] = {}
+    for fqn in sorted(dep_graph.entities):
+        comp_name = mapping.get(fqn, conformance.UNMAPPED)
+        grouped.setdefault(comp_name, []).append(fqn)
+
+    components: list[Component] = []
+    for comp_spec in spec.components:
+        entities = grouped.get(comp_spec.name)
+        if not entities:
+            continue
+        responsibility = (
+            f"Spec component (layer={comp_spec.layer})"
+            if comp_spec.layer
+            else "Spec component"
+        )
+        components.append(
+            Component(
+                name=comp_spec.name,
+                responsibility=responsibility,
+                entities=entities,
+            )
+        )
+
+    unmapped = grouped.get(conformance.UNMAPPED, [])
+    if unmapped:
+        components.append(
+            Component(
+                name="Unmapped",
+                responsibility=f"Entities not matched by {spec_file.name}",
+                entities=unmapped,
+            )
+        )
+
+    return Architecture(
+        components=components,
+        rationale=(
+            f"Spec-based grouping using {spec_file.name} "
+            f"({len(components)} component(s), {len(unmapped)} unmapped entity/entities)."
+        ),
+        algorithm="spec",
+    )
+
+
 @tool(
     name="recover",
     description="Recover software architecture from a dependency graph. "
-    "Supports multiple algorithms: pkg (package-based), wca (weighted clustering), "
-    "acdc (pattern-based), arc (concern-based via LLM), limbo (information-theoretic).",
+    "Supports multiple algorithms: pkg (package-based), spec (architecture.spec.json), "
+    "wca (weighted clustering), acdc (pattern-based), arc (concern-based via LLM), "
+    "limbo (information-theoretic).",
 )
 def recover(
     dep_graph: DependencyGraph,
@@ -307,6 +366,7 @@ def recover(
     similarity_measure: str = "uem",
     pkg_depth: int | None = None,
     hybrid_weight: float = 0.5,
+    spec_path: str | None = None,
 ) -> Architecture:
     """Recover software architecture using the specified algorithm.
 
@@ -314,6 +374,7 @@ def recover(
         dep_graph: Dependency graph to analyze.
         algorithm: Recovery algorithm to use:
             - 'pkg': Package-based grouping (fast, deterministic)
+            - 'spec': Component grouping defined by ``architecture.spec.json``
             - 'wca': Weighted Clustering Algorithm (agglomerative)
             - 'acdc': ACDC pattern-based clustering
             - 'arc': Architecture Recovery using Concerns (LLM-powered)
@@ -323,12 +384,16 @@ def recover(
         pkg_depth: Package depth for 'pkg' algorithm. Auto if None.
         hybrid_weight: ARC semantic/structural blend (0-1). 1.0 = pure semantic,
             0.0 = pure structural, 0.5 = equal blend (default).
+        spec_path: Path to ``architecture.spec.json`` (required for ``algorithm='spec'``).
 
     Returns:
         Architecture with recovered components.
     """
     if algorithm == "pkg":
         return _package_based_recovery(dep_graph, depth=pkg_depth)
+    elif algorithm == "spec":
+        resolved = spec_path or "architecture.spec.json"
+        return _spec_based_recovery(dep_graph, resolved)
     elif algorithm == "wca":
         return wca(
             dep_graph,
@@ -350,4 +415,4 @@ def recover(
             hybrid_weight=hybrid_weight,
         )
     else:
-        raise ValueError(f"Unknown algorithm: {algorithm}. Use: pkg, wca, acdc, arc, limbo")
+        raise ValueError(f"Unknown algorithm: {algorithm}. Use: pkg, spec, wca, acdc, arc, limbo")

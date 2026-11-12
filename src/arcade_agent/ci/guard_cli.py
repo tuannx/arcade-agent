@@ -15,6 +15,7 @@ the human-readable summary. ``check`` exits 1 on FAIL unless ``--fail-on never``
 import argparse
 import json
 import sys
+from pathlib import Path
 from typing import Any
 
 from arcade_agent.tools import guard
@@ -30,7 +31,7 @@ def _print_violations(violations: list[dict[str, Any]]) -> None:
             print(f"          fix: {v['fix']}")
 
 
-def _render(cmd: str, result: dict[str, Any]) -> None:
+def _render(cmd: str, result: dict[str, Any], *, changed_only: bool = False) -> None:
     if cmd == "init":
         print(f"Wrote the {result['template']} template to {result['spec_path']}.")
         print("Adjust the component `match` globs to your layout, then run "
@@ -53,6 +54,25 @@ def _render(cmd: str, result: dict[str, Any]) -> None:
             print(f"  - {p['rule']}: {p['message']}")
             print(f"    fix: {p['fix']}")
     elif cmd == "check":
+        if changed_only and "touched_components" in result:
+            touched = result["touched_components"]
+            scoped_v = result.get("scoped_violations", [])
+            scoped_verdict = result.get("scoped_verdict", "PASS")
+            print(
+                f"{_ICON[scoped_verdict]} (changed modules: {', '.join(touched) or 'none'}): "
+                f"{result.get('scoped_errors', 0)} error(s), "
+                f"{result.get('scoped_warnings', 0)} warning(s) "
+                f"[repo total: {result['errors']} error(s), {result['warnings']} warning(s)]"
+            )
+            for comp in result.get("component_summary", []):
+                print(
+                    f"  - {comp['component']} ({comp.get('layer') or 'n/a'}): "
+                    f"entities={comp['entities']}, out={comp['out_edges']}, "
+                    f"in={comp['in_edges']}, from_err={comp['violations_from']}, "
+                    f"to_err={comp['violations_to']}, in_cycle={comp['in_cycle']}"
+                )
+            _print_violations(scoped_v)
+            return
         print(f"{_ICON[result['verdict']]}: {result['errors']} error(s), "
               f"{result['warnings']} warning(s), {result['num_entities']} entities "
               f"({result['unmapped_entities']} unmapped)")
@@ -65,6 +85,17 @@ def _render(cmd: str, result: dict[str, Any]) -> None:
         for i, v in enumerate(result["actions"], 1):
             print(f"  {i}. [{v['severity']}] {v['rule']}: {v['message']}")
             print(f"     -> {v['fix']}")
+
+
+def _collect_changed_files(args: argparse.Namespace) -> list[str] | None:
+    files: list[str] = list(getattr(args, "changed_files", None) or [])
+    files_from = getattr(args, "changed_files_file", None)
+    if files_from:
+        path = Path(files_from).expanduser()
+        files.extend(line.strip() for line in path.read_text().splitlines() if line.strip())
+    if getattr(args, "changed_only", False) or getattr(args, "changed_files", None) or files_from:
+        return files
+    return None
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -102,8 +133,24 @@ def main(argv: list[str] | None = None) -> int:
 
     sp = add("check", "Conformance verdict; exits 1 on FAIL (gate)")
     sp.add_argument("--language", default=None, help="Language (auto-detect if omitted)")
-    sp.add_argument("--fail-on", choices=["error", "never"], default="error")
+    sp.add_argument("--fail-on", choices=["error", "touched", "never"], default="error")
     sp.add_argument("--no-cache", action="store_true", help="Ignore the parse cache")
+    sp.add_argument(
+        "--changed-files",
+        nargs="*",
+        default=None,
+        help="Changed file paths used to compute touched component scope",
+    )
+    sp.add_argument(
+        "--changed-files-file",
+        default=None,
+        help="File containing newline-separated changed paths",
+    )
+    sp.add_argument(
+        "--changed-only",
+        action="store_true",
+        help="Render only touched components and their violations in text output",
+    )
 
     sp = add("remediate", "Ranked fixes to restore conformance")
     sp.add_argument("--language", default=None)
@@ -117,8 +164,13 @@ def main(argv: list[str] | None = None) -> int:
         elif args.cmd == "preview":
             result = guard.preview_impact(args.frm, args.to, args.source, args.spec)
         elif args.cmd == "check":
+            changed_files = _collect_changed_files(args)
             result = guard.check_architecture(
-                args.source, args.spec, language=args.language, use_cache=not args.no_cache
+                args.source,
+                args.spec,
+                language=args.language,
+                use_cache=not args.no_cache,
+                changed_files=changed_files,
             )
         else:
             result = guard.remediate(args.source, args.spec, language=args.language)
@@ -129,9 +181,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.json:
         print(json.dumps(result, indent=2))
     else:
-        _render(args.cmd, result)
-    if args.cmd == "check" and result["verdict"] == "FAIL" and args.fail_on == "error":
-        return 1
+        _render(args.cmd, result, changed_only=bool(getattr(args, "changed_only", False)))
+    if args.cmd == "check":
+        if args.fail_on == "touched" and result.get("scoped_verdict") == "FAIL":
+            return 1
+        if args.fail_on == "error" and result["verdict"] == "FAIL":
+            return 1
     return 0
 
 

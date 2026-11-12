@@ -634,3 +634,44 @@ def test_build_comment_shows_score_drivers_when_available():
     assert "### 🎯 Score Drivers" in comment
     assert "Top Risk Driver" in comment
     assert "HubBalance" in comment
+
+
+def test_build_comment_changed_only_filters_untouched_components_and_preserves_spec_names():
+    baseline = _multi_entity_snapshot("abc1234", [
+        {"name": "contracts", "entities": ["contracts.org.OrgType"]},
+        {"name": "mod-integrations", "entities": ["modules.integrations.Slack"]},
+        {"name": "mod-billing", "entities": ["modules.billing.Invoice"]},
+    ])
+    baseline["algorithm"] = "spec"
+    baseline["smells"] = [
+        {
+            "smell_type": "cyclic_dependency",
+            "severity": "high",
+            "affected_components": ["mod-billing"],
+        },
+        {
+            "smell_type": "hub_like_dependency",
+            "severity": "medium",
+            "affected_components": ["mod-integrations"],
+        },
+    ]
+
+    current = _multi_entity_snapshot("def5678", [
+        {"name": "contracts", "entities": ["contracts.org.OrgType"]},
+        {
+            "name": "mod-integrations",
+            "entities": ["modules.integrations.Slack", "modules.integrations.Jira"],
+        },
+        {"name": "mod-billing", "entities": ["modules.billing.Invoice"]},
+    ])
+    current["algorithm"] = "spec"
+    current["smells"] = list(baseline["smells"])
+
+    comment = build_comment(current, baseline, changed_only=True)
+
+    assert "Changed components breakdown (1/3)" in comment
+    assert "| mod-integrations | 2 |" in comment
+    assert "| mod-billing |" not in comment
+    assert "| contracts |" not in comment
+    assert "hub_like_dependency" in comment
+    assert "cyclic_dependency" not in comment

@@ -375,3 +375,74 @@ def test_mcp_returns_spec_errors_as_data(tmp_path: Path) -> None:
     )
     blocks = content[0] if isinstance(content, tuple) else content
     assert "No architecture spec" in json.loads(blocks[0].text)["error"]
+
+
+# -- spec recovery and changed-only scoping ----------------------------------------
+
+
+def test_recover_spec_maps_declared_components_separately(project: Path) -> None:
+    from arcade_agent.tools.parse import parse
+    from arcade_agent.tools.recover import recover
+
+    dep_graph = parse(str(project), use_cache=False)
+    arch = recover(
+        dep_graph,
+        algorithm="spec",
+        spec_path=str(project / guard.SPEC_FILENAME),
+    )
+
+    assert arch.algorithm == "spec"
+    assert [comp.name for comp in arch.components] == ["api", "service", "store", "domain"]
+
+
+def test_check_changed_files_scopes_violations_and_summary(
+    project: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (project / "app/api/orders_api.py").write_text(SHORTCUT_API)
+
+    # Touching only domain should report domain PASS (0 scoped violations),
+    # even though api still has an existing shortcut violation.
+    domain_only = guard.check_architecture(
+        str(project),
+        use_cache=False,
+        changed_files=["app/domain/order.py"],
+    )
+    assert domain_only["verdict"] == "FAIL"
+    assert domain_only["touched_components"] == ["domain"]
+    assert domain_only["scoped_verdict"] == "PASS"
+    assert domain_only["scoped_violations"] == []
+
+    # --fail-on touched exits 0 when touched module is clean, 1 when touched module violates.
+    assert (
+        guard_main(
+            [
+                "check",
+                str(project),
+                "--no-cache",
+                "--changed-only",
+                "--changed-files",
+                "app/domain/order.py",
+                "--fail-on",
+                "touched",
+            ]
+        )
+        == 0
+    )
+    assert (
+        guard_main(
+            [
+                "check",
+                str(project),
+                "--no-cache",
+                "--changed-only",
+                "--changed-files",
+                "app/api/orders_api.py",
+                "--fail-on",
+                "touched",
+            ]
+        )
+        == 1
+    )
+    out = capsys.readouterr().out
+    assert "changed modules: api" in out
+    assert "api -> store is forbidden" in out

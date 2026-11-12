@@ -89,7 +89,15 @@ def main() -> None:
     parser.add_argument(
         "--algorithm",
         default="pkg",
-        help="Architecture recovery algorithm (pkg, wca, acdc)",
+        help="Architecture recovery algorithm (pkg, spec, wca, acdc)",
+    )
+    parser.add_argument(
+        "--spec",
+        default="",
+        help=(
+            "Optional architecture.spec.json path (used when --algorithm spec; "
+            "defaults to <source>/architecture.spec.json)"
+        ),
     )
     parser.add_argument(
         "--num-clusters",
@@ -155,7 +163,23 @@ def main() -> None:
     print(f"  {graph.num_entities} entities, {graph.num_edges} edges")
 
     print(f"[3/5] Recovering architecture ({args.algorithm})...")
-    arch = recover(graph, algorithm=args.algorithm, num_clusters=args.num_clusters)
+    spec_path: str | None = None
+    if args.algorithm == "spec":
+        candidate = (
+            Path(args.spec).expanduser()
+            if args.spec
+            else Path(source) / "architecture.spec.json"
+        )
+        if not candidate.is_file():
+            print(f"  Spec file not found: {candidate}", file=sys.stderr)
+            sys.exit(1)
+        spec_path = str(candidate)
+    arch = recover(
+        graph,
+        algorithm=args.algorithm,
+        num_clusters=args.num_clusters,
+        spec_path=spec_path,
+    )
     print(f"  {len(arch.components)} components recovered")
 
     print("[4/5] Detecting smells and computing metrics...")
